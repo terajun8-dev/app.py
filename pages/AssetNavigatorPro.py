@@ -7,7 +7,7 @@ import pandas as pd
 st.set_page_config(page_title="Asset Navigator Pro", layout="wide")
 
 st.title("📈 Asset Navigator Pro")
-st.caption("Monte Carlo Simulation: Full Risk & Target Analysis")
+st.caption("Monte Carlo Simulation: Real-time Target Achievement Analysis")
 
 # --- 設定ガイド ---
 with st.expander("📚 設定のヒント"):
@@ -21,8 +21,8 @@ with st.expander("📚 設定のヒント"):
     with col_h2:
         st.markdown("""
         ### ブラックスワン（突発的な暴落）
-        * **4.0%**: 25年に一度（リーマン・コロナ級）
-        * **10.0%**: 10年に一度（必ず一度は経験する嵐）
+        * **2.0%**: 50年に一度（非常に稀な大恐慌）
+        * **4.0%**: 25年に一度（現実的な警戒）
         """)
 
 # --- サイドバー設定 ---
@@ -73,21 +73,16 @@ def run_simulation(n_sim, initial_asset, annual_return, annual_volatility, total
         for m in range(1, total_months + 1):
             noise = np.random.normal(0, 1)
             growth = np.exp((annual_return - 0.5 * annual_volatility**2) * dt + annual_volatility * np.sqrt(dt) * noise)
-            
             if use_bs and bs_prob > 0 and np.random.rand() < m_bs_prob:
                 growth *= (1 + bs_impact)
                 bs_events[i].append(m)
-            
             current *= growth
             if "Accumulation" in mode:
-                if m <= investment_period:
-                    current += monthly_investment
+                if m <= investment_period: current += monthly_investment
             else:
                 current -= (withdrawal * (1 + m_inf)**m)
-            
             val = current / ((1 + m_inf)**m) if inf_rate > 0 else current
             all_results[i, m] = max(0, val)
-            
     return all_results, bs_events
 
 # --- メインロジック ---
@@ -100,72 +95,85 @@ if run_button:
     p_97_5, p_2_5 = np.percentile(results, [97.5, 2.5], axis=0)
     p_84, p_16 = np.percentile(results, [84, 16], axis=0)
     
-    # 元本割れリスクの計算
+    # 指標計算
     success_rate = (np.sum(final_p > 0) / sim_count) * 100
     prob_above_initial = (np.sum(final_p >= initial_asset) / sim_count) * 100
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("最終資産（中央値）", f"{int(p_median[-1]):,} 万円")
-    col2.metric("成功率（残高>0）", f"{success_rate:.1f} %")
-    col3.metric("元本維持率", f"{prob_above_initial:.1f} %")
-    col4.metric("試行回数", f"{sim_count:,}")
+    # 1. メイン表示エリア
+    col_main, col_targets = st.columns([3, 1])
 
-    # --- 1. 推移グラフ ---
-    st.subheader("Interactive Monthly Projection (Multi-Sigma)")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(width=0), showlegend=False))
-    fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, fill='tonexty', fillcolor='rgba(255,165,0,0.05)', name='2σ Range (95%)', line=dict(width=0)))
-    fig.add_trace(go.Scatter(x=time_axis, y=p_84, line=dict(width=0), showlegend=False))
-    fig.add_trace(go.Scatter(x=time_axis, y=p_16, fill='tonexty', fillcolor='rgba(40,167,69,0.15)', name='1σ Range (68%)', line=dict(width=0)))
-    fig.add_trace(go.Scatter(x=time_axis, y=p_median, line=dict(color='#007bff', width=3), name='Median (中央値)'))
+    with col_main:
+        st.subheader("Interactive Monthly Projection")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(width=0), showlegend=False))
+        fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, fill='tonexty', fillcolor='rgba(255,165,0,0.05)', name='2σ (95%)', line=dict(width=0)))
+        fig.add_trace(go.Scatter(x=time_axis, y=p_84, line=dict(width=0), showlegend=False))
+        fig.add_trace(go.Scatter(x=time_axis, y=p_16, fill='tonexty', fillcolor='rgba(40,167,69,0.15)', name='1σ (68%)', line=dict(width=0)))
+        fig.add_trace(go.Scatter(x=time_axis, y=p_median, line=dict(color='#007bff', width=3), name='Median (中央値)'))
 
-    if use_bs:
-        bs_indices = [i for i, log in enumerate(bs_logs) if len(log) > 0]
-        idx = np.random.choice(bs_indices) if bs_indices else np.random.randint(0, sim_count)
-        fig.add_trace(go.Scatter(x=time_axis, y=results[idx, :], line=dict(color='red', width=2), name='個別サンプルの軌跡'))
+        if use_bs:
+            bs_indices = [i for i, log in enumerate(bs_logs) if len(log) > 0]
+            idx = np.random.choice(bs_indices) if bs_indices else np.random.randint(0, sim_count)
+            fig.add_trace(go.Scatter(x=time_axis, y=results[idx, :], line=dict(color='red', width=2), name='暴落遭遇サンプル'))
+        
+        if "Accumulation" in mode and 0 < investment_period < total_months:
+            fig.add_vline(x=investment_period, line_dash="dot", line_color="gray", annotation_text="積立終了")
+
+        fig.update_layout(xaxis_title="Months", yaxis_title="Asset (万円)", template="plotly_white", height=500, margin=dict(l=20, r=20, t=20, b=20))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_targets:
+        st.subheader("Target Probabilities")
+        st.write("---")
+        
+        # ターゲット達成率の計算と表示
+        targets_dict = {
+            "成功率 (残高>0)": 0.01, # 破綻回避
+            "元本維持以上": initial_asset,
+            "元本の1.5倍": initial_asset * 1.5,
+            "元本の2.0倍": initial_asset * 2.0,
+            "資産1億円以上": 10000
+        }
+        
+        for name, threshold in targets_dict.items():
+            prob = (np.sum(final_p >= threshold) / sim_count) * 100
+            st.metric(name, f"{prob:.1f} %")
+            st.progress(prob / 100)
+            st.write("")
+
+    st.divider()
+
+    # 2. 下部：分布図と詳細レポート
+    col_dist, col_rep = st.columns([2, 1])
     
-    if "Accumulation" in mode and 0 < investment_period < total_months:
-        fig.add_vline(x=investment_period, line_dash="dot", line_color="gray", annotation_text="積立終了")
-
-    fig.update_layout(xaxis_title="Months", yaxis_title="Asset (万円)", template="plotly_white", height=500)
-    st.plotly_chart(fig, use_container_width=True)
-
-    # --- 2. ブラックスワン診断レポート ---
-    if use_bs:
-        st.subheader(f"🧐 個別サンプルの詳細診断（パスID: {idx}）")
-        sample_bs = bs_logs[idx]
-        if sample_bs:
-            st.warning(f"⚠️ 期間中に **{len(sample_bs)}回** の暴落に遭遇しました。発生月: {', '.join([f'{m}ヶ月目' for m in sample_bs])}")
-        else:
-            st.success("✨ このサンプルでは暴落は発生しませんでした。")
-
-    # --- 3. 分布図 & ターゲット達成率 ---
-    st.subheader("Final Asset Distribution & Targets")
-    c1, c2 = st.columns([3, 1])
-    
-    with c1:
-        fig_hist = go.Figure(data=[go.Histogram(x=final_p, nbinsx=100, marker_color='#6c757d', opacity=0.4, name='分布')])
+    with col_dist:
+        st.subheader("Final Asset Distribution & Sigma Analysis")
+        fig_hist = go.Figure(data=[go.Histogram(x=final_p, nbinsx=80, marker_color='#6c757d', opacity=0.4)])
         # 統計ライン
         stats = {
             'Median': (np.median(final_p), '#007bff', 'solid', 3),
             'Initial': (initial_asset, '#6f42c1', 'dash', 2),
             '1σ (84%)': (np.percentile(final_p, 84), '#28a745', 'dash', 1),
             '1σ (16%)': (np.percentile(final_p, 16), '#28a745', 'dash', 1),
-            '2σ (2.5%)': (np.percentile(final_p, 2.5), '#ffc107', 'dot', 1),
         }
         for label, (val, color, dash, width) in stats.items():
             fig_hist.add_vline(x=val, line_dash=dash, line_color=color, line_width=width, annotation_text=label)
-        fig_hist.update_layout(xaxis_title="最終資産 (万円)", yaxis_title="頻度", template="plotly_white", height=450, showlegend=False)
+        fig_hist.update_layout(xaxis_title="最終資産 (万円)", template="plotly_white", height=400)
         st.plotly_chart(fig_hist, use_container_width=True)
 
-    with c2:
-        st.markdown("### ターゲット達成率")
-        targets_list = [initial_asset, initial_asset * 1.5, initial_asset * 2, 10000]
-        target_names = ['元本維持', '1.5倍', '2.0倍', '1億円']
-        t_probs = [(np.sum(final_p >= t) / sim_count) * 100 for t in targets_list]
-        df_res = pd.DataFrame({"目標": target_names, "達成確率 (%)": [f"{p:.1f}%" for p in t_probs]})
-        st.table(df_res)
-        st.caption("※インフレ調整後の実質価値ベース")
+    with col_rep:
+        if use_bs:
+            st.subheader("Individual Path Report")
+            sample_bs = bs_logs[idx]
+            if sample_bs:
+                st.warning(f"Path ID: {idx} は、{len(sample_bs)}回の暴落に遭遇しました。")
+                st.write(f"発生月: {', '.join([f'{m}' for m in sample_bs])}")
+                st.info(f"最終資産: {int(results[idx, -1]):,} 万円")
+            else:
+                st.success("このサンプルは暴落なしで完走しました。")
+        else:
+            st.info("ブラックスワン設定をONにすると、個別の不運なシナリオ分析が表示されます。")
 
 else:
-    st.info("条件を入力し、実行ボタンを押してください。")
+    st.info("条件を入力し、実行ボタンを押してください。グラフ横にターゲット達成率が表示されます。")
+    
