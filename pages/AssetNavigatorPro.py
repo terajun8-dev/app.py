@@ -9,20 +9,22 @@ st.set_page_config(page_title="Asset Navigator Pro", layout="wide")
 st.title("📈 Asset Navigator Pro")
 st.caption("Monte Carlo Simulation: Individual Path & Black Swan Analysis")
 
-# --- 設定ガイド ---
+# --- 設定ガイド (数値を当初通りに修正) ---
 with st.expander("📚 設定のヒント（ここをクリック）"):
     col_h1, col_h2 = st.columns(2)
     with col_h1:
         st.markdown("""
         ### 市場リスク（通常のゆれ）
-        - **全世界株式**: 期待 5~7% / リスク 15~20%
-        - **米国S&P500**: 期待 7~9% / リスク 18~22%
+        * **全世界株式**: 期待 5.0 ~ 7.0% / リスク 15.0 ~ 20.0%
+        * **米国S&P500**: 期待 7.0 ~ 9.0% / リスク 18.0 ~ 22.0%
+        * **定期預金**: 期待 0.1 ~ 0.3% / リスク 0%
         """)
     with col_h2:
         st.markdown("""
         ### ブラックスワン（突発的な暴落）
-        - **4.0%**: 25年に一度（リーマン・コロナ級）
-        - **10.0%**: 10年に一度（必ず一度は経験する嵐）
+        * **2.0%**: 50年に一度（非常に稀な大恐慌）
+        * **4.0%**: 25年に一度（リーマン・コロナ級）
+        * **10.0%**: 10年に一度（必ず一度は経験する嵐）
         """)
 
 # --- サイドバー設定 ---
@@ -65,10 +67,8 @@ def run_simulation(n_sim, initial_asset, annual_return, annual_volatility, total
         current = initial_asset
         for m in range(1, total_months + 1):
             noise = np.random.normal(0, 1)
-            # 通常の市場変動（ボラティリティ）
             growth = np.exp((annual_return - 0.5 * annual_volatility**2) * dt + annual_volatility * np.sqrt(dt) * noise)
             
-            # ブラックスワン（暴落）の判定
             if bs_prob > 0 and np.random.rand() < m_bs_prob:
                 growth *= (1 + bs_impact)
                 bs_events[i].append(m)
@@ -92,7 +92,6 @@ if run_button:
     p_50 = np.median(results, axis=0)
     p_97_5, p_2_5 = np.percentile(results, [97.5, 2.5], axis=0)
     
-    # 指標
     col1, col2, col3 = st.columns(3)
     col1.metric("中央値（最終資産）", f"{int(p_50[-1]):,} 万円")
     col2.metric("成功率（残高 > 0）", f"{(np.sum(results[:, -1] > 0) / sim_count)*100:.1f} %")
@@ -105,8 +104,7 @@ if run_button:
     fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, fill='tonexty', fillcolor='rgba(255,165,0,0.1)', name='95%信頼区間', line=dict(width=0)))
     fig.add_trace(go.Scatter(x=time_axis, y=p_50, line=dict(color='#007bff', width=3), name='全体の中央値'))
 
-    # 赤い線（サンプル）の選択
-    # 暴落が起きたシナリオがあれば優先的に表示、なければランダム
+    # ブラックスワン遭遇パスを優先表示
     bs_indices = [i for i, log in enumerate(bs_logs) if len(log) > 0]
     idx = np.random.choice(bs_indices) if bs_indices else np.random.randint(0, sim_count)
     
@@ -116,41 +114,32 @@ if run_button:
     fig.add_trace(go.Scatter(x=time_axis, y=sample_path, line=dict(color='red', width=2), name='個別サンプルの軌跡'))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- ブラックスワン・レポート ---
+    # --- 個別診断レポート ---
     st.subheader(f"🧐 個別サンプルの詳細診断（パスID: {idx}）")
     r1, r2 = st.columns([2, 1])
-    
     with r1:
         if not use_bs:
-            st.info("ℹ️ ブラックスワン設定がOFFです。赤い線は通常の市場リスク（ボラティリティ）による変動のみを示しています。")
+            st.info("ℹ️ ブラックスワン設定がOFFのため、赤い線は通常のゆれのみを示しています。")
         elif not sample_bs:
-            st.success("✨ 幸運なことに、このサンプルの期間中にはブラックスワンは発生しませんでした。")
+            st.success("✨ このサンプルでは期間中にブラックスワンは発生しませんでした。")
         else:
-            st.warning(f"⚠️ 期間中に **{len(sample_bs)}回** の暴落に直撃しました。")
-            st.write(f"**発生時期:** {', '.join([f'{m}ヶ月目' for m in sample_bs])}")
-            # 最初の下落の大きさを計算
-            m0 = sample_bs[0]
-            loss = sample_path[m0-1] - sample_path[m0]
-            st.write(f"特に{m0}ヶ月目の下落では、実質価値が **約{int(loss)}万円** 急減しました。これが現実ならメンタルが試されます。")
-
+            st.warning(f"⚠️ 期間中に **{len(sample_bs)}回** の暴落に遭遇しました。")
+            st.write(f"**発生月:** {', '.join([f'{m}ヶ月目' for m in sample_bs])}")
     with r2:
         final_v = sample_path[-1]
         if final_v <= 0:
-            st.error(f"**【破綻】** \n資産が尽きました。暴落のタイミングが悪かったか、リスクの取りすぎです。")
-        elif final_v > initial_asset:
-            st.info(f"**【目標達成】** \n暴落を乗り越え、最終的に元本以上の **{int(final_v)}万円** を確保しました。")
+            st.error(f"**結果: 破綻**")
         else:
-            st.warning(f"**【停滞】** \n元本を割り込む **{int(final_v)}万円** で終了。回復が間に合いませんでした。")
+            st.info(f"**最終資産: {int(final_v):,} 万円**")
 
-    # --- 分布図 ---
-    st.subheader("Final Asset Distribution")
+    # --- 分布図 (ターゲット線) ---
+    st.subheader("Final Asset Distribution & Targets")
     fig_hist = go.Figure(data=[go.Histogram(x=results[:, -1], nbinsx=80, marker_color='#6c757d', opacity=0.5)])
-    targets = [initial_asset, initial_asset * 2, 10000]
-    names = ['Initial', '2.0x', '100M']
-    for v, n in zip(targets, names):
+    targets_vals = [initial_asset, initial_asset * 1.5, initial_asset * 2, 10000]
+    target_names = ['Initial', '1.5x', '2.0x', '100M']
+    for v, n in zip(targets_vals, target_names):
         fig_hist.add_vline(x=v, line_dash="dash", line_color="red", annotation_text=n)
     fig_hist.update_layout(xaxis_title="最終資産 (万円)", template="plotly_white", height=400)
     st.plotly_chart(fig_hist, use_container_width=True)
-
 else:
-    st.info("サイドバーで条件を設定し、実行ボタンを押してください。")
+    st.info("条件を入力し、実行ボタンを押してください。")
