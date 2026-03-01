@@ -7,23 +7,7 @@ import pandas as pd
 st.set_page_config(page_title="Asset Navigator Pro", layout="wide")
 
 st.title("📈 Asset Navigator Pro")
-st.caption("Monte Carlo Simulation: Real-time Target Achievement Analysis")
-
-# --- 設定ガイド ---
-with st.expander("📚 設定のヒント"):
-    col_h1, col_h2 = st.columns(2)
-    with col_h1:
-        st.markdown("""
-        ### 市場リスク（通常のゆれ）
-        * **全世界株式**: 期待 5.0 ~ 7.0% / リスク 15.0 ~ 20.0%
-        * **米国S&P500**: 期待 7.0 ~ 9.0% / リスク 18.0 ~ 22.0%
-        """)
-    with col_h2:
-        st.markdown("""
-        ### ブラックスワン（突発的な暴落）
-        * **2.0%**: 50年に一度（非常に稀な大恐慌）
-        * **4.0%**: 25年に一度（現実的な警戒）
-        """)
+st.caption("Monte Carlo Simulation: Full-Width Sigma & Risk Analysis")
 
 # --- サイドバー設定 ---
 with st.sidebar:
@@ -98,82 +82,75 @@ if run_button:
     # 指標計算
     success_rate = (np.sum(final_p > 0) / sim_count) * 100
     prob_above_initial = (np.sum(final_p >= initial_asset) / sim_count) * 100
+    prob_1_5x = (np.sum(final_p >= initial_asset * 1.5) / sim_count) * 100
 
-    # 1. メイン表示エリア
-    col_main, col_targets = st.columns([3, 1])
+    # 1. グラフ上部のメトリクス（横一列）
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("最終資産 (中央値)", f"{int(p_median[-1]):,} 万円")
+    m2.metric("成功率 (残高 > 0)", f"{success_rate:.1f} %")
+    m3.metric("元本維持率 (損なし)", f"{prob_above_initial:.1f} %")
+    m4.metric("1.5倍達成率", f"{prob_1_5x:.1f} %")
 
-    with col_main:
-        st.subheader("Interactive Monthly Projection")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(width=0), showlegend=False))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, fill='tonexty', fillcolor='rgba(255,165,0,0.05)', name='2σ (95%)', line=dict(width=0)))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_84, line=dict(width=0), showlegend=False))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_16, fill='tonexty', fillcolor='rgba(40,167,69,0.15)', name='1σ (68%)', line=dict(width=0)))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_median, line=dict(color='#007bff', width=3), name='Median (中央値)'))
+    # 2. メイン推移グラフ（大きく表示）
+    st.subheader("Interactive Monthly Projection (Sigma Ranges)")
+    fig = go.Figure()
+    # 2σ (95%)
+    fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(width=0), showlegend=False))
+    fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, fill='tonexty', fillcolor='rgba(255,165,0,0.08)', name='2σ Range (95%)', line=dict(width=0)))
+    # 1σ (68%)
+    fig.add_trace(go.Scatter(x=time_axis, y=p_84, line=dict(width=0), showlegend=False))
+    fig.add_trace(go.Scatter(x=time_axis, y=p_16, fill='tonexty', fillcolor='rgba(40,167,69,0.15)', name='1σ Range (68%)', line=dict(width=0)))
+    # Median
+    fig.add_trace(go.Scatter(x=time_axis, y=p_median, line=dict(color='#007bff', width=4), name='Median (中央値)'))
 
-        if use_bs:
-            bs_indices = [i for i, log in enumerate(bs_logs) if len(log) > 0]
-            idx = np.random.choice(bs_indices) if bs_indices else np.random.randint(0, sim_count)
-            fig.add_trace(go.Scatter(x=time_axis, y=results[idx, :], line=dict(color='red', width=2), name='暴落遭遇サンプル'))
-        
-        if "Accumulation" in mode and 0 < investment_period < total_months:
-            fig.add_vline(x=investment_period, line_dash="dot", line_color="gray", annotation_text="積立終了")
+    if use_bs:
+        bs_indices = [i for i, log in enumerate(bs_logs) if len(log) > 0]
+        idx = np.random.choice(bs_indices) if bs_indices else np.random.randint(0, sim_count)
+        fig.add_trace(go.Scatter(x=time_axis, y=results[idx, :], line=dict(color='red', width=2.5), name='暴落遭遇サンプル'))
+        st.info(f"🚩 **ブラックスワン診断（Path ID: {idx}）**: この赤い線の人物は、期間中に **{len(bs_logs[idx])}回** の暴落を経験しました。最終資産は **{int(results[idx, -1]):,} 万円** です。")
+    
+    if "Accumulation" in mode and 0 < investment_period < total_months:
+        fig.add_vline(x=investment_period, line_dash="dot", line_color="gray", annotation_text="積立終了")
 
-        fig.update_layout(xaxis_title="Months", yaxis_title="Asset (万円)", template="plotly_white", height=500, margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_targets:
-        st.subheader("Target Probabilities")
-        st.write("---")
-        
-        # ターゲット達成率の計算と表示
-        targets_dict = {
-            "成功率 (残高>0)": 0.01, # 破綻回避
-            "元本維持以上": initial_asset,
-            "元本の1.5倍": initial_asset * 1.5,
-            "元本の2.0倍": initial_asset * 2.0,
-            "資産1億円以上": 10000
-        }
-        
-        for name, threshold in targets_dict.items():
-            prob = (np.sum(final_p >= threshold) / sim_count) * 100
-            st.metric(name, f"{prob:.1f} %")
-            st.progress(prob / 100)
-            st.write("")
+    fig.update_layout(xaxis_title="Months", yaxis_title="Asset (万円)", template="plotly_white", height=600)
+    st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
 
-    # 2. 下部：分布図と詳細レポート
-    col_dist, col_rep = st.columns([2, 1])
+    # 3. 分布図（大きく表示）
+    st.subheader("Final Asset Distribution & Sigma Analysis")
+    fig_hist = go.Figure(data=[go.Histogram(x=final_p, nbinsx=120, marker_color='#6c757d', opacity=0.4, name='分布')])
     
-    with col_dist:
-        st.subheader("Final Asset Distribution & Sigma Analysis")
-        fig_hist = go.Figure(data=[go.Histogram(x=final_p, nbinsx=80, marker_color='#6c757d', opacity=0.4)])
-        # 統計ライン
-        stats = {
-            'Median': (np.median(final_p), '#007bff', 'solid', 3),
-            'Initial': (initial_asset, '#6f42c1', 'dash', 2),
-            '1σ (84%)': (np.percentile(final_p, 84), '#28a745', 'dash', 1),
-            '1σ (16%)': (np.percentile(final_p, 16), '#28a745', 'dash', 1),
-        }
-        for label, (val, color, dash, width) in stats.items():
-            fig_hist.add_vline(x=val, line_dash=dash, line_color=color, line_width=width, annotation_text=label)
-        fig_hist.update_layout(xaxis_title="最終資産 (万円)", template="plotly_white", height=400)
-        st.plotly_chart(fig_hist, use_container_width=True)
+    # 統計情報の詳細表示
+    stats = {
+        'Median': (np.median(final_p), '#007bff', 'solid', 4),
+        'Initial (元本)': (initial_asset, '#6f42c1', 'dash', 3),
+        '1σ (84%)': (np.percentile(final_p, 84), '#28a745', 'dash', 2),
+        '1σ (16%)': (np.percentile(final_p, 16), '#28a745', 'dash', 2),
+        '2σ (97.5%)': (np.percentile(final_p, 97.5), '#ffc107', 'dot', 2),
+        '2σ (2.5%)': (np.percentile(final_p, 2.5), '#ffc107', 'dot', 2),
+    }
+    
+    for label, (val, color, dash, width) in stats.items():
+        fig_hist.add_vline(x=val, line_dash=dash, line_color=color, line_width=width, 
+                          annotation_text=f"{label}: {int(val)}", 
+                          annotation_position="top left")
 
-    with col_rep:
-        if use_bs:
-            st.subheader("Individual Path Report")
-            sample_bs = bs_logs[idx]
-            if sample_bs:
-                st.warning(f"Path ID: {idx} は、{len(sample_bs)}回の暴落に遭遇しました。")
-                st.write(f"発生月: {', '.join([f'{m}' for m in sample_bs])}")
-                st.info(f"最終資産: {int(results[idx, -1]):,} 万円")
-            else:
-                st.success("このサンプルは暴落なしで完走しました。")
-        else:
-            st.info("ブラックスワン設定をONにすると、個別の不運なシナリオ分析が表示されます。")
+    fig_hist.update_layout(xaxis_title="最終資産 (万円)", yaxis_title="出現頻度", template="plotly_white", height=550)
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+    # 4. ターゲット達成率テーブル
+    st.subheader("Target Achievement Summary")
+    targets_list = [initial_asset, initial_asset * 1.5, initial_asset * 2, 10000]
+    target_names = ['元本維持以上', '元本の1.5倍', '元本の2.0倍', '資産1億円以上']
+    t_probs = [(np.sum(final_p >= t) / sim_count) * 100 for t in targets_list]
+    
+    # 横並びの達成率カード
+    cols = st.columns(len(targets_list))
+    for i, col in enumerate(cols):
+        col.write(f"**{target_names[i]}**")
+        col.progress(t_probs[i] / 100)
+        col.write(f"{t_probs[i]:.1f} %")
 
 else:
-    st.info("条件を入力し、実行ボタンを押してください。グラフ横にターゲット達成率が表示されます。")
-    
+    st.info("左側のサイドバーで条件を設定し、実行ボタンを押してください。大画面で詳細なリスク分析が表示されます。")
