@@ -8,14 +8,14 @@ st.set_page_config(page_title="Asset Navigator Pro", layout="wide")
 st.title("📈 Asset Navigator Pro")
 st.caption("モンテカルロ法による標準偏差・ブラックスワン・4%ルール検証")
 
-# --- サイドバー設定 (日本語のまま) ---
+# --- サイドバー設定 (日本語) ---
 with st.sidebar:
     st.header("1. 基本設定")
     initial_asset = st.number_input("初期資産 (万円)", value=2000, step=100)
     
-    mode = st.radio("モード選択", ["積立投資モード", "4%ルール取り崩しモード"])
+    mode = st.radio("モード選択", ["Accumulation (積立)", "4% Rule Withdrawal (取崩)"])
     
-    if mode == "積立投資モード":
+    if "Accumulation" in mode:
         monthly_investment = st.slider("毎月の積立額 (万円)", 0, 50, 10)
     else:
         monthly_investment = 0
@@ -46,6 +46,7 @@ def run_simulation():
     all_results = np.zeros((simulations, months + 1))
     all_results[:, 0] = initial_asset
     
+    # 4%ルールの初期取り崩し額
     initial_withdrawal_monthly = (initial_asset * 0.04) / 12
 
     for i in range(simulations):
@@ -53,21 +54,25 @@ def run_simulation():
         current_withdrawal = initial_withdrawal_monthly
         
         for m in range(1, months + 1):
+            # 市場変動
             noise = np.random.normal(0, 1)
             growth = np.exp((annual_return - 0.5 * annual_volatility**2) * dt + 
                             annual_volatility * np.sqrt(dt) * noise)
             
+            # ブラックスワン判定
             if use_black_swan and np.random.rand() < (bs_prob / 12):
                 growth *= (1 + bs_impact)
             
             current_asset *= growth
             
-            if mode == "4%ルール取り崩しモード":
+            # 資金移動
+            if "Withdrawal" in mode:
                 current_asset -= current_withdrawal
                 current_withdrawal *= (1 + inflation_rate)**(1/12)
             else:
                 current_asset += monthly_investment
             
+            # インフレ調整
             val = current_asset
             if use_inflation:
                 val /= (1 + inflation_rate)**(m/12)
@@ -84,43 +89,50 @@ median_final = np.median(results[:, -1])
 failure_rate = (np.sum(results[:, -1] <= 0) / len(results)) * 100
 
 col1, col2 = st.columns(2)
-col1.metric("最終資産 中央値", f"{int(median_final)} 万円")
-col2.metric("資産枯渇確率", f"{failure_rate:.1f} %", delta_color="inverse")
+col1.metric("Median Final Asset (中央値)", f"{int(median_final)} 万円")
+col2.metric("Failure Rate (資産枯渇確率)", f"{failure_rate:.1f} %", delta_color="inverse")
 
-# --- グラフ表示 (ここを英語化) ---
-fig, ax = plt.subplots(figsize=(10, 5))
+# --- グラフ表示 (視覚的な区別を強化) ---
+fig, ax = plt.subplots(figsize=(10, 6))
 
-# パーセンタイル計算
+# 各パーセンタイルの計算
 p_50 = np.median(results, axis=0)
 p_84 = np.percentile(results, 84, axis=0)
 p_16 = np.percentile(results, 16, axis=0)
 p_97_5 = np.percentile(results, 97.5, axis=0)
 p_2_5 = np.percentile(results, 2.5, axis=0)
 
-# ラインとバンドの描画
-ax.plot(time_axis, p_50, color='#1f77b4', lw=2, label='Median (Most Likely)')
-ax.fill_between(time_axis, p_16, p_84, color='#1f77b4', alpha=0.3, label='1-sigma Range (68%)')
-ax.fill_between(time_axis, p_2_5, p_97_5, color='#1f77b4', alpha=0.1, label='2-sigma Range (95%)')
+# 1. 最も外側の範囲 (±2σ / 95% 確率)
+ax.plot(time_axis, p_97_5, color='#1f77b4', linestyle='--', lw=1, alpha=0.4)
+ax.plot(time_axis, p_2_5, color='#1f77b4', linestyle='--', lw=1, alpha=0.4)
+ax.fill_between(time_axis, p_2_5, p_97_5, color='#1f77b4', alpha=0.07, label='2-sigma Range (95% Prob.)')
+
+# 2. 内側の範囲 (±1σ / 68% 確率) - 網掛け(hatch)を追加
+ax.fill_between(time_axis, p_16, p_84, color='#1f77b4', alpha=0.2, 
+                hatch='///', edgecolor='#1f77b4', linewidth=0, label='1-sigma Range (68% Prob.)')
+
+# 3. 中央値 (最も太い実線)
+ax.plot(time_axis, p_50, color='#1f77b4', lw=3, label='Median (Most Likely)')
 
 # グラフのラベル設定 (英語)
-ax.set_title(f"Asset Projection: {mode}", fontsize=14)
+ax.set_title(f"Asset Projection: {mode}", fontsize=14, pad=20)
 ax.set_xlabel("Years", fontsize=10)
 ax.set_ylabel("Asset Balance (10k JPY)", fontsize=10)
-ax.axhline(0, color='black', lw=1, alpha=0.5)
-ax.legend(loc='upper left')
-ax.grid(True, linestyle='--', alpha=0.4)
+ax.axhline(0, color='black', lw=1.5, alpha=0.7)
+ax.legend(loc='upper left', frameon=True, shadow=True)
+ax.grid(True, linestyle=':', alpha=0.6)
 
 st.pyplot(fig)
 
-# --- ヒストグラム (ここも英語) ---
+# --- ヒストグラム ---
 st.subheader("Final Asset Distribution")
 fig_hist, ax_hist = plt.subplots(figsize=(10, 3))
 ax_hist.hist(results[:, -1], bins=50, color='skyblue', edgecolor='white', alpha=0.8)
 ax_hist.axvline(median_final, color='red', linestyle='--', label='Median')
-ax_hist.set_title("Distribution of Outcomes at End Year")
+ax_hist.set_title("Distribution of Outcomes at Final Year")
 ax_hist.set_xlabel("Asset Value (10k JPY)")
 ax_hist.set_ylabel("Frequency")
 ax_hist.legend()
 st.pyplot(fig_hist)
 
-st.info("💡 中央の濃い青線（Median）が最も可能性が高い推移です。薄い色の範囲（2-sigma）の下限が0に重なる場合、暴落時に資産が底をつくリスクがあることを示しています。")
+st.info("💡 **Tips:** \n- **Median (濃い線)**: 半数のシナリオがこれより上、半数が下になります。\n- **1-sigma (斜線)**: 最も現実的に起こりうる範囲です。\n- **2-sigma (薄い範囲)**: 稀ですが、最悪・最良のケースを含みます。破線が0に触れている場合、破綻のリスクがあります。")
