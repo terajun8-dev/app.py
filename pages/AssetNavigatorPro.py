@@ -9,6 +9,25 @@ st.set_page_config(page_title="Asset Navigator Pro", layout="wide")
 st.title("📈 Asset Navigator Pro")
 st.caption("Monte Carlo Simulation: Full-Width Sigma & Risk Analysis")
 
+# --- 📚 設定のヒント（復活！） ---
+with st.expander("📚 設定の目安と用語解説（ここをクリック）"):
+    col_h1, col_h2 = st.columns(2)
+    with col_h1:
+        st.markdown("""
+        ### 1. 市場リスク（通常のゆれ）
+        * **全世界株式**: 期待 5.0 ~ 7.0% / リスク 15.0 ~ 20.0%
+        * **米国S&P500**: 期待 7.0 ~ 9.0% / リスク 18.0 ~ 22.0%
+        * **定期預金**: 期待 0.1 ~ 0.3% / リスク 0.0%
+        """)
+    with col_h2:
+        st.markdown("""
+        ### 2. ブラックスワン（突発的な暴落）
+        * **2.0%**: 50年に一度（非常に稀な大恐慌）
+        * **4.0%**: 25年に一度（現実的な警戒 / リーマン・コロナ級）
+        * **10.0%**: 10年に一度（必ず一度は経験する前提の嵐）
+        """)
+    st.info("※1σ（シグマ）は約68%の確率、2σは約95%の確率でその範囲に収まることを意味します。")
+
 # --- サイドバー設定 ---
 with st.sidebar:
     st.header("1. 基本設定")
@@ -84,30 +103,27 @@ if run_button:
     prob_above_initial = (np.sum(final_p >= initial_asset) / sim_count) * 100
     prob_1_5x = (np.sum(final_p >= initial_asset * 1.5) / sim_count) * 100
 
-    # 1. グラフ上部のメトリクス（横一列）
+    # 1. グラフ上部のメトリクス
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("最終資産 (中央値)", f"{int(p_median[-1]):,} 万円")
     m2.metric("成功率 (残高 > 0)", f"{success_rate:.1f} %")
     m3.metric("元本維持率 (損なし)", f"{prob_above_initial:.1f} %")
     m4.metric("1.5倍達成率", f"{prob_1_5x:.1f} %")
 
-    # 2. メイン推移グラフ（大きく表示）
+    # 2. メイン推移グラフ
     st.subheader("Interactive Monthly Projection (Sigma Ranges)")
     fig = go.Figure()
-    # 2σ (95%)
     fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(width=0), showlegend=False))
     fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, fill='tonexty', fillcolor='rgba(255,165,0,0.08)', name='2σ Range (95%)', line=dict(width=0)))
-    # 1σ (68%)
     fig.add_trace(go.Scatter(x=time_axis, y=p_84, line=dict(width=0), showlegend=False))
     fig.add_trace(go.Scatter(x=time_axis, y=p_16, fill='tonexty', fillcolor='rgba(40,167,69,0.15)', name='1σ Range (68%)', line=dict(width=0)))
-    # Median
     fig.add_trace(go.Scatter(x=time_axis, y=p_median, line=dict(color='#007bff', width=4), name='Median (中央値)'))
 
     if use_bs:
         bs_indices = [i for i, log in enumerate(bs_logs) if len(log) > 0]
         idx = np.random.choice(bs_indices) if bs_indices else np.random.randint(0, sim_count)
         fig.add_trace(go.Scatter(x=time_axis, y=results[idx, :], line=dict(color='red', width=2.5), name='暴落遭遇サンプル'))
-        st.info(f"🚩 **ブラックスワン診断（Path ID: {idx}）**: この赤い線の人物は、期間中に **{len(bs_logs[idx])}回** の暴落を経験しました。最終資産は **{int(results[idx, -1]):,} 万円** です。")
+        st.info(f"🚩 **ブラックスワン診断（Path ID: {idx}）**: 赤い線は期間中に **{len(bs_logs[idx])}回** の暴落を経験。最終資産は **{int(results[idx, -1]):,} 万円**。")
     
     if "Accumulation" in mode and 0 < investment_period < total_months:
         fig.add_vline(x=investment_period, line_dash="dot", line_color="gray", annotation_text="積立終了")
@@ -117,18 +133,18 @@ if run_button:
 
     st.divider()
 
-    # 3. 分布図（大きく表示）
+    # 3. 分布図
     st.subheader("Final Asset Distribution & Sigma Analysis")
     fig_hist = go.Figure(data=[go.Histogram(x=final_p, nbinsx=120, marker_color='#6c757d', opacity=0.4, name='分布')])
     
-    # 統計情報の詳細表示
+    # 統計情報の詳細表示（中央値・元本・標準偏差）
     stats = {
         'Median': (np.median(final_p), '#007bff', 'solid', 4),
-        'Initial (元本)': (initial_asset, '#6f42c1', 'dash', 3),
-        '1σ (84%)': (np.percentile(final_p, 84), '#28a745', 'dash', 2),
-        '1σ (16%)': (np.percentile(final_p, 16), '#28a745', 'dash', 2),
-        '2σ (97.5%)': (np.percentile(final_p, 97.5), '#ffc107', 'dot', 2),
-        '2σ (2.5%)': (np.percentile(final_p, 2.5), '#ffc107', 'dot', 2),
+        'Initial (元本割れ境界)': (initial_asset, '#6f42c1', 'dash', 3),
+        '1σ (上位16%)': (np.percentile(final_p, 84), '#28a745', 'dash', 2),
+        '1σ (下位16%)': (np.percentile(final_p, 16), '#28a745', 'dash', 2),
+        '2σ (上位2.5%)': (np.percentile(final_p, 97.5), '#ffc107', 'dot', 2),
+        '2σ (下位2.5%)': (np.percentile(final_p, 2.5), '#ffc107', 'dot', 2),
     }
     
     for label, (val, color, dash, width) in stats.items():
@@ -139,18 +155,18 @@ if run_button:
     fig_hist.update_layout(xaxis_title="最終資産 (万円)", yaxis_title="出現頻度", template="plotly_white", height=550)
     st.plotly_chart(fig_hist, use_container_width=True)
 
-    # 4. ターゲット達成率テーブル
+    # 4. ターゲット達成率テーブル（視覚化）
     st.subheader("Target Achievement Summary")
-    targets_list = [initial_asset, initial_asset * 1.5, initial_asset * 2, 10000]
-    target_names = ['元本維持以上', '元本の1.5倍', '元本の2.0倍', '資産1億円以上']
-    t_probs = [(np.sum(final_p >= t) / sim_count) * 100 for t in targets_list]
+    t_list = [initial_asset, initial_asset * 1.5, initial_asset * 2, 10000]
+    t_names = ['元本維持以上', '元本の1.5倍', '元本の2.0倍', '資産1億円以上']
+    t_probs = [(np.sum(final_p >= t) / sim_count) * 100 for t in t_list]
     
-    # 横並びの達成率カード
-    cols = st.columns(len(targets_list))
+    cols = st.columns(len(t_list))
     for i, col in enumerate(cols):
-        col.write(f"**{target_names[i]}**")
+        col.write(f"**{t_names[i]}**")
         col.progress(t_probs[i] / 100)
         col.write(f"{t_probs[i]:.1f} %")
 
 else:
-    st.info("左側のサイドバーで条件を設定し、実行ボタンを押してください。大画面で詳細なリスク分析が表示されます。")
+    st.info("左側のサイドバーで条件を設定し、実行ボタンを押してください。")
+    
