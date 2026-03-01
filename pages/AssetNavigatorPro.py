@@ -7,155 +7,148 @@ import pandas as pd
 st.set_page_config(page_title="Asset Navigator Pro", layout="wide")
 
 st.title("📈 Asset Navigator Pro")
-st.caption("Advanced Monte Carlo Simulation with Risk Guide")
+st.caption("Monte Carlo Simulation: Individual Path & Black Swan Analysis")
 
-# --- ヘルプセクション (画面上部に折りたたみで配置) ---
-with st.expander("📚 使い方ガイドと設定の目安（ここをクリック）"):
+# --- 使い方ガイド（前回の内容を維持） ---
+with st.expander("📚 設定の目安と用語解説"):
     col_h1, col_h2 = st.columns(2)
     with col_h1:
         st.markdown("""
-        ### 1. 市場リスク設定のヒント
-        | 資産タイプ | 期待収益率 | 標準偏差(リスク) |
+        ### 市場リスク設定のヒント
+        | 資産タイプ | 期待収益率 | 標準偏差 |
         | :--- | :---: | :---: |
-        | **定期預金** | 0.1 ~ 0.3% | 0% |
-        | **全世界株式** | 5.0 ~ 7.0% | 15.0 ~ 20.0% |
-        | **米国株(S&P500)**| 7.0 ~ 9.0% | 18.0 ~ 22.0% |
-        | **レバレッジ投信**| 10% ~ | 30.0% ~ |
-        *※リスクは「振れ幅」を意味します。*
+        | **定期預金** | 0.2% | 0% |
+        | **全世界株式** | 5~7% | 15~20% |
         """)
     with col_h2:
         st.markdown("""
-        ### 2. ブラックスワン（暴落）の考え方
-        「何年に一度の危機」を想定するかで確率を決めます。
-        - **2.0%**: 50年に一度（非常に稀な大恐慌）
-        - **4.0%**: 25年に一度（リーマン・コロナ級）
-        - **10.0%**: 10年に一度（必ず一度は経験する嵐）
-        
-        **下落率の目安**: 一般的な株式指数なら **-30% 〜 -50%** を想定するのが堅実です。
+        ### ブラックスワン確率の目安
+        - **2.0%**: 50年に一度（超稀）
+        - **4.0%**: 25年に一度（現実的な警戒）
+        - **10.0%**: 10年に一度（必ず遭遇する前提）
         """)
-    
-    st.divider()
-    st.markdown("""
-    ### 3. 指標の読み方
-    - **Success Rate**: 期間終了まで資産が一度も 0円 にならなかった確率。
-    - **Prob. > Initial**: 最終的に「開始時の資産」より増えて終わった確率。
-    - **Worst-Case (Lower 5%)**: 2000回中、下から100番目くらいの「相当運が悪い」結果。
-    """)
 
 # --- サイドバー設定 ---
 with st.sidebar:
     st.header("1. 基本設定")
     initial_asset = st.number_input("初期資産 (万円)", value=2000, step=100)
     mode = st.radio("モード選択", ["Accumulation (積立)", "4% Rule Withdrawal (取崩)"])
+    monthly_investment = st.number_input("毎月の積立額 (万円)", value=10, min_value=0) if "Accumulation" in mode else 0
+    total_months = st.number_input("シミュレーション期間 (ヶ月)", value=120, min_value=1)
     
-    if "Accumulation" in mode:
-        monthly_investment = st.number_input("毎月の積立額 (万円)", value=10, min_value=0, step=1)
-    else:
-        monthly_investment = 0
-        
-    total_months = st.number_input("シミュレーション期間 (ヶ月)", value=120, min_value=1, step=1)
+    st.header("2. 詳細設定")
+    sim_count = st.selectbox("試行回数", options=[1000, 2000, 5000, 10000], index=1)
+    annual_return = st.number_input("期待収益率 (%)", value=5.0, step=0.1) / 100
+    annual_volatility = st.number_input("リスク/標準偏差 (%)", value=15.0, step=0.1) / 100
     
-    st.header("2. シミュレーション設定")
-    sim_count = st.selectbox("試行回数", options=[1000, 2000, 3000, 5000, 10000, 20000], index=1)
-    
-    st.header("3. 市場リスク・インフレ")
-    annual_return = st.number_input("期待収益率 (年利 %)", value=5.0, step=0.1) / 100
-    annual_volatility = st.number_input("標準偏差 / リスク (年次 %)", value=15.0, min_value=0.0, step=0.1) / 100
-    
-    use_inflation = st.checkbox("インフレ率を考慮 (実質価値)", value=True)
-    inflation_rate_annual = st.number_input("年間インフレ率 (%)", value=2.0, step=0.1) / 100 if use_inflation else 0.0
+    st.header("3. オプション")
+    use_inflation = st.checkbox("インフレ考慮", value=True)
+    inf_rate = st.number_input("インフレ率 (%)", value=2.0) / 100 if use_inflation else 0
     
     st.header("4. ブラックスワン設定")
-    use_black_swan = st.checkbox("暴落イベントを考慮", value=True)
-    if use_black_swan:
-        bs_prob_annual = st.number_input("発生確率 (年次 %)", value=2.0, min_value=0.0, max_value=100.0, step=0.1) / 100
-        bs_impact = st.number_input("下落率 (%)", value=-40.0, max_value=-0.1, step=1.0) / 100
+    use_bs = st.checkbox("暴落を考慮", value=True)
+    bs_prob = st.number_input("発生確率 (%)", value=4.0) / 100 if use_bs else 0
+    bs_impact = st.number_input("下落率 (%)", value=-40.0) / 100 if use_bs else 0
 
     st.markdown("---")
     run_button = st.button("🚀 シミュレーションを実行", use_container_width=True, type="primary")
 
-# --- シミュレーション関数 (前回と同様) ---
-def run_simulation(n_sim, initial_asset, annual_return, annual_volatility, total_months, monthly_investment, mode, use_inflation, inflation_rate_annual, use_black_swan, bs_prob_annual, bs_impact):
+# --- シミュレーション関数 (暴落記録機能付き) ---
+def run_simulation(n_sim, initial_asset, annual_return, annual_volatility, total_months, monthly_investment, mode, inf_rate, bs_prob, bs_impact):
     dt = 1/12
     all_results = np.zeros((n_sim, total_months + 1))
     all_results[:, 0] = initial_asset
-    initial_withdrawal_monthly = (initial_asset * 0.04) / 12
-    monthly_inflation = (1 + inflation_rate_annual)**(1/12) - 1
-    monthly_bs_prob = bs_prob_annual / 12
+    bs_events = [[] for _ in range(n_sim)] # 各試行の暴落発生月を記録
+    
+    m_inf = (1 + inf_rate)**(1/12) - 1
+    m_bs_prob = bs_prob / 12
+    withdrawal = (initial_asset * 0.04) / 12
 
     for i in range(n_sim):
-        current_asset = initial_asset
-        current_withdrawal = initial_withdrawal_monthly
+        current = initial_asset
         for m in range(1, total_months + 1):
             noise = np.random.normal(0, 1)
             growth = np.exp((annual_return - 0.5 * annual_volatility**2) * dt + annual_volatility * np.sqrt(dt) * noise)
-            if use_black_swan and np.random.rand() < monthly_bs_prob:
+            
+            # ブラックスワン判定
+            if bs_prob > 0 and np.random.rand() < m_bs_prob:
                 growth *= (1 + bs_impact)
-            current_asset *= growth
-            if "Withdrawal" in mode:
-                current_asset -= current_withdrawal
-                current_withdrawal *= (1 + monthly_inflation)
-            else:
-                current_asset += monthly_investment
-            val = current_asset / ((1 + monthly_inflation)**m) if use_inflation else current_asset
-            all_results[i, m] = max(0, val)
-    return all_results
+                bs_events[i].append(m) # 発生月を記録
+            
+            current *= growth
+            current = current + monthly_investment if "Accumulation" in mode else current - (withdrawal * (1 + m_inf)**m)
+            all_results[i, m] = max(0, current / ((1 + m_inf)**m))
+            
+    return all_results, bs_events
 
 # --- メインロジック ---
 if run_button:
-    with st.spinner(f"{sim_count:,} 回のシナリオを計算中..."):
-        results = run_simulation(sim_count, initial_asset, annual_return, annual_volatility, total_months, monthly_investment, mode, use_inflation, inflation_rate_annual, use_black_swan, bs_prob_annual if use_black_swan else 0, bs_impact if use_black_swan else 0)
-        
-        time_axis = np.arange(total_months + 1)
-        final_values = results[:, -1]
-        p_50 = np.median(results, axis=0)
-        p_84, p_16 = np.percentile(results, 84, axis=0), np.percentile(results, 16, axis=0)
-        p_97_5, p_2_5 = np.percentile(results, 97.5, axis=0), np.percentile(results, 2.5, axis=0)
-        p_5 = np.percentile(results, 5, axis=0)
+    results, bs_logs = run_simulation(sim_count, initial_asset, annual_return, annual_volatility, total_months, monthly_investment, mode, inf_rate, bs_prob, bs_impact)
+    
+    time_axis = np.arange(total_months + 1)
+    p_50 = np.median(results, axis=0)
+    p_97_5, p_2_5 = np.percentile(results, [97.5, 2.5], axis=0)
+    p_84, p_16 = np.percentile(results, [84, 16], axis=0)
+    
+    # メトリクス
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Median Final Asset", f"{int(p_50[-1]):,} 万円")
+    col2.metric("Success Rate", f"{(np.sum(results[:, -1] > 0) / sim_count)*100:.1f} %")
+    col3.metric("Simulation Paths", f"{sim_count:,}")
 
-        failure_rate = (np.sum(final_values <= 0) / len(results)) * 100
-        prob_above_initial = (np.sum(final_values > initial_asset) / len(results)) * 100
+    # --- 時系列グラフ ---
+    st.subheader("Interactive Monthly Projection")
+    fig = go.Figure()
+    # 統計帯
+    fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(width=0), showlegend=False))
+    fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, fill='tonexty', fillcolor='rgba(255,165,0,0.1)', name='95% Range', line=dict(width=0)))
+    fig.add_trace(go.Scatter(x=time_axis, y=p_50, line=dict(color='#007bff', width=3), name='Median (Overall)'))
 
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Median Final Asset", f"{int(p_50[-1])} 万円")
-        col2.metric("Success Rate", f"{100 - failure_rate:.1f} %")
-        col3.metric("Prob. > Initial", f"{prob_above_initial:.1f} %")
-        col4.metric("Simulation Paths", f"{len(results):,}")
+    # ランダムサンプルの抽出
+    idx = np.random.randint(0, sim_count)
+    sample_path = results[idx, :]
+    sample_bs = bs_logs[idx]
+    
+    fig.add_trace(go.Scatter(x=time_axis, y=sample_path, line=dict(color='red', width=2), name='Sample Individual Path'))
+    fig.update_layout(xaxis_title="Months", yaxis_title="Asset (万円)", template="plotly_white", height=500)
+    st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("Interactive Monthly Projection")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(color='rgba(255,165,0,0)', width=0), showlegend=False, hoverinfo='skip'))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, line=dict(color='rgba(255,165,0,0)', width=0), fill='tonexty', fillcolor='rgba(255,165,0,0.05)', name='2-sigma (95%)'))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_84, line=dict(color='rgba(40,167,69,0)', width=0), showlegend=False, hoverinfo='skip'))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_16, line=dict(color='rgba(40,167,69,0)', width=0), fill='tonexty', fillcolor='rgba(40,167,69,0.15)', name='1-sigma (68%)'))
-        fig.add_trace(go.Scatter(x=time_axis, y=p_50, line=dict(color='#007bff', width=4), name='Median'))
-        fig.update_layout(xaxis_title="Months", yaxis_title="Asset (10k JPY)", hovermode="x unified", template="plotly_white", height=500)
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.subheader("Final Asset Distribution & Targets")
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            fig_hist = go.Figure(data=[go.Histogram(x=final_values, nbinsx=100, marker_color='#6c757d', opacity=0.4)])
-            targets_vals = [initial_asset, initial_asset * 1.5, initial_asset * 2, 10000]
-            target_colors = ['#6f42c1', '#dc3545', '#fd7e14', '#20c997']
-            target_names = ['Initial', '1.5x', '2.0x', '100M']
-            for val, color, name in zip(targets_vals, target_colors, target_names):
-                fig_hist.add_vline(x=val, line_dash="dash", line_color=color, annotation_text=name, annotation_position="top right")
-            fig_hist.add_vline(x=p_50[-1], line_width=3, line_color="#007bff", annotation_text="Median")
-            fig_hist.update_layout(xaxis_title="Final Asset (10k JPY)", yaxis_title="Count", template="plotly_white", height=450)
-            st.plotly_chart(fig_hist, use_container_width=True)
-        with c2:
-            st.markdown("### Achievability")
-            t_probs = [(np.sum(final_values >= t) / len(results)) * 100 for t in targets_vals]
-            df_res = pd.DataFrame({"Target": target_names, "Prob (%)": [f"{p:.1f}%" for p in t_probs]})
-            st.table(df_res)
-
-        st.subheader("⚠️ Worst-Case Scenario Analysis")
-        worst_final = int(p_5[-1])
-        if worst_final <= 0:
-            depletion_month = np.where(p_5 <= 0)[0][0]
-            st.error(f"ワースト5%のシナリオでは、**{depletion_month}ヶ月目** に資産が底をつく可能性があります。")
+    # --- ブラックスワン・個別レポート ---
+    st.subheader(f"🧐 Sample Path Analysis (Path ID: {idx})")
+    rep_col1, rep_col2 = st.columns([2, 1])
+    
+    with rep_col1:
+        if not sample_bs:
+            st.success("✨ このシナリオの人物は、期間中に一度もブラックスワン（暴落）に遭遇しませんでした。非常に幸運な一生です。")
         else:
-            st.warning(f"最悪のケース（下位5%）でも、最終的に **{worst_final}万円** 残る計算です。")
+            st.warning(f"⚠️ この人物は期間中に **{len(sample_bs)}回** のブラックスワンに遭遇しました。")
+            events_str = ", ".join([f"{m}ヶ月目" for m in sample_bs])
+            st.write(f"**発生時期:** {events_str}")
+            
+            # 暴落の影響解説
+            first_bs = sample_bs[0]
+            drop_val = sample_path[first_bs-1] - sample_path[first_bs]
+            st.write(f"特に{first_bs}ヶ月目の暴落では、一瞬で実質 **約{int(drop_val)}万円** の価値が失われました。")
+
+    with rep_col2:
+        final_val = sample_path[-1]
+        diff = final_val - initial_asset
+        if final_val <= 0:
+            st.error(f"**結果: 破綻** \n資産が底をつきました。暴落のタイミングが悪く、回復不能なダメージを受けました。")
+        elif diff > 0:
+            st.info(f"**結果: 勝利** \n暴落に遭いながらも、最終的に元本を **{int(diff)}万円** 上回って完走しました。")
+        else:
+            st.warning(f"**結果: 停滞** \n暴落の影響で、最終資産は元本を **{int(abs(diff))}万円** 下回りました。")
+
+    # --- 分布図 ---
+    st.subheader("Final Asset Distribution")
+    fig_hist = go.Figure(data=[go.Histogram(x=results[:, -1], nbinsx=80, marker_color='#6c757d', opacity=0.5)])
+    targets = [initial_asset, initial_asset * 2, 10000]
+    names = ['Initial', '2.0x', '100M']
+    for v, n in zip(targets, names):
+        fig_hist.add_vline(x=v, line_dash="dash", line_color="red", annotation_text=n)
+    fig_hist.update_layout(xaxis_title="Final Asset (万円)", template="plotly_white", height=400)
+    st.plotly_chart(fig_hist, use_container_width=True)
+
 else:
-    st.info("サイドバーで数値を入力し、「シミュレーションを実行」ボタンを押してください。")
+    st.info("サイドバーで条件を設定し、実行ボタンを押してください。赤い線（個別サンプル）が暴落に遭うまで何度か試してみるのがおすすめです。")
