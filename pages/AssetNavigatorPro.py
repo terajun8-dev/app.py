@@ -7,39 +7,41 @@ import pandas as pd
 st.set_page_config(page_title="Asset Navigator Pro", layout="wide")
 
 st.title("📈 Asset Navigator Pro")
-st.caption("Advanced Monte Carlo Simulation: Multi-Target & Risk Analysis")
+st.caption("Monte Carlo Simulation: Precise Input Model")
 
-# --- サイドバー設定 ---
+# --- サイドバー設定 (数値入力に切り替え) ---
 with st.sidebar:
     st.header("1. 基本設定")
     initial_asset = st.number_input("初期資産 (万円)", value=2000, step=100)
     mode = st.radio("モード選択", ["Accumulation (積立)", "4% Rule Withdrawal (取崩)"])
     
     if "Accumulation" in mode:
-        monthly_investment = st.slider("毎月の積立額 (万円)", 0, 100, 10)
+        monthly_investment = st.number_input("毎月の積立額 (万円)", value=10, min_value=0, step=1)
     else:
         monthly_investment = 0
         
-    total_months = st.slider("シミュレーション期間 (ヶ月)", 1, 600, 120)
+    total_months = st.number_input("シミュレーション期間 (ヶ月)", value=120, min_value=1, step=1)
     
     st.header("2. シミュレーション設定")
-    sim_count = st.select_slider(
+    sim_count = st.selectbox(
         "試行回数 (Simulation Paths)",
         options=[1000, 2000, 3000, 5000, 10000, 20000],
-        value=2000
+        index=1
     )
     
     st.header("3. 市場リスク・インフレ")
-    annual_return = st.slider("期待収益率 (年利 %)", -5.0, 15.0, 5.0) / 100
-    annual_volatility = st.slider("標準偏差 / リスク (年次 %)", 0.0, 30.0, 15.0) / 100
+    # スライダーから数値入力(number_input)に変更
+    annual_return = st.number_input("期待収益率 (年利 %)", value=5.0, step=0.1) / 100
+    annual_volatility = st.number_input("標準偏差 / リスク (年次 %)", value=15.0, min_value=0.0, step=0.1) / 100
+    
     use_inflation = st.checkbox("インフレ率を考慮 (実質価値)", value=True)
-    inflation_rate_annual = st.slider("年間インフレ率 (%)", 0.0, 5.0, 2.0) / 100 if use_inflation else 0.0
+    inflation_rate_annual = st.number_input("年間インフレ率 (%)", value=2.0, step=0.1) / 100 if use_inflation else 0.0
     
     st.header("4. ブラックスワン設定")
     use_black_swan = st.checkbox("暴落イベントを考慮", value=True)
     if use_black_swan:
-        bs_prob_annual = st.slider("発生確率 (年次 %)", 0.0, 10.0, 2.0) / 100
-        bs_impact = st.slider("下落率 (%)", -80, -10, -40) / 100
+        bs_prob_annual = st.number_input("発生確率 (年次 %)", value=2.0, min_value=0.0, max_value=100.0, step=0.1) / 100
+        bs_impact = st.number_input("下落率 (%)", value=-40.0, max_value=-0.1, step=1.0) / 100
 
     st.markdown("---")
     run_button = st.button("🚀 シミュレーションを実行", use_container_width=True, type="primary")
@@ -83,13 +85,11 @@ if run_button:
         time_axis = np.arange(total_months + 1)
         final_values = results[:, -1]
         
-        # パーセンタイル計算
         p_50 = np.median(results, axis=0)
         p_84, p_16 = np.percentile(results, 84, axis=0), np.percentile(results, 16, axis=0)
         p_97_5, p_2_5 = np.percentile(results, 97.5, axis=0), np.percentile(results, 2.5, axis=0)
         p_5 = np.percentile(results, 5, axis=0)
 
-        # 指標
         failure_rate = (np.sum(final_values <= 0) / len(results)) * 100
         prob_above_initial = (np.sum(final_values > initial_asset) / len(results)) * 100
 
@@ -99,33 +99,29 @@ if run_button:
         col3.metric("Prob. > Initial", f"{prob_above_initial:.1f} %")
         col4.metric("Simulation Paths", f"{len(results):,}")
 
-        # --- メイングラフ (Plotly) ---
+        # --- グラフ (Target lines + Percentiles) ---
         st.subheader("Interactive Monthly Projection with Target Lines")
         fig = go.Figure()
 
-        # 標準偏差帯 (1σ, 2σ) の塗りつぶし
+        # 範囲表示
         fig.add_trace(go.Scatter(x=time_axis, y=p_97_5, line=dict(color='rgba(255,165,0,0.2)', width=1, dash='dot'), name='2-sigma Upper (97.5%)'))
         fig.add_trace(go.Scatter(x=time_axis, y=p_2_5, line=dict(color='rgba(255,165,0,0.2)', width=1, dash='dot'), fill='tonexty', fillcolor='rgba(255,165,0,0.05)', name='2-sigma Lower (2.5%)'))
-        
         fig.add_trace(go.Scatter(x=time_axis, y=p_84, line=dict(color='rgba(40,167,69,0.3)', width=1), name='1-sigma Upper (84%)'))
         fig.add_trace(go.Scatter(x=time_axis, y=p_16, line=dict(color='rgba(40,167,69,0.3)', width=1), fill='tonexty', fillcolor='rgba(40,167,69,0.15)', name='1-sigma Lower (16%)'))
+        fig.add_trace(go.Scatter(x=time_axis, y=p_50, line=dict(color='#007bff', width=4), name='Median'))
 
-        # 中央値
-        fig.add_trace(go.Scatter(x=time_axis, y=p_50, line=dict(color='#007bff', width=4), name='Median (Most Likely)'))
-
-        # --- ターゲット線の追加 (横線) ---
+        # ターゲット横線
         targets_vals = [initial_asset, initial_asset * 1.5, initial_asset * 2, 10000]
-        target_colors = ['#6f42c1', '#dc3545', '#fd7e14', '#20c997'] # 紫, 赤, オレンジ, 緑
+        target_colors = ['#6f42c1', '#dc3545', '#fd7e14', '#20c997']
         target_names = ['Target: Initial', 'Target: 1.5x', 'Target: 2.0x', 'Target: 100M JPY']
         
         for val, color, name in zip(targets_vals, target_colors, target_names):
-            fig.add_hline(y=val, line_dash="dash", line_color=color, 
-                          annotation_text=name, annotation_position="top right")
+            fig.add_hline(y=val, line_dash="dash", line_color=color, annotation_text=name, annotation_position="top right")
 
         fig.update_layout(xaxis_title="Months", yaxis_title="Asset (10k JPY)", hovermode="x unified", template="plotly_white", height=600)
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- リスク分析 ---
+        # リスク分析
         st.subheader("⚠️ Worst-Case Scenario Analysis (Lower 5%)")
         worst_final = int(p_5[-1])
         if worst_final <= 0:
@@ -134,12 +130,10 @@ if run_button:
         else:
             st.warning(f"ワースト5%の極めて厳しい状況下でも、最終的に **{worst_final}万円** の資産が残る見込みです。")
 
-        # --- 分布と達成表 ---
+        # 分布とテーブル
         c1, c2 = st.columns([2, 1])
         with c1:
             st.subheader("Final Asset Distribution")
-            fig_hist = go.Figure()
-            fig_hist.add_trace(go.Scatter(x=final_values, y=np.random.normal(0,1,len(final_values)), mode='markers', marker=dict(opacity=0.1), showlegend=False)) # ダミー
             fig_hist = go.Figure(data=[go.Histogram(x=final_values, nbinsx=60, marker_color='#6c757d', opacity=0.6)])
             fig_hist.add_vline(x=p_50[-1], line_width=3, line_dash="dash", line_color="#007bff")
             fig_hist.update_layout(xaxis_title="Final Asset (10k JPY)", template="plotly_white", height=350)
@@ -150,4 +144,4 @@ if run_button:
             df_res = pd.DataFrame({"Target Outcome": target_names, "Prob (%)": [f"{p:.1f}%" for p in t_probs]})
             st.table(df_res)
 else:
-    st.info("サイドバーで条件を設定し、「シミュレーションを実行」ボタンを押してください。")
+    st.info("サイドバーで数値を入力し、「シミュレーションを実行」ボタンを押してください。")
