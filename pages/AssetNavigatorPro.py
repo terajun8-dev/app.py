@@ -134,6 +134,7 @@ if run_button:
         st.warning(f"🚩 **個別分析（Path ID: {idx}）**: この赤い線の人は **{len(bs_logs[idx])}回** の暴落に遭遇しました。")
     
     fig.update_layout(xaxis_title="Months", yaxis_title="Asset (万円)", template="plotly_white", height=600)
+    fig.update_traces(hovertemplate="<b>資産額: %{y:,.0f} 万円</b><br>月数: %{x} 月目<br>%{fullData.name}<extra></extra>")
     st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
