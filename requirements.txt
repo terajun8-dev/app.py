@@ -10,3 +10,5 @@ google-api-python-client
 yt-dlp
 matplotlib
 pygame
+PyOpenGL
+PyOpenGL_accelerate
