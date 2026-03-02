@@ -9,3 +9,4 @@ xlrd>=2.0.1  # 古いExcel (.xls) 用
 google-api-python-client
 yt-dlp
 matplotlib
+pygame
