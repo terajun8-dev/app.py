@@ -22,7 +22,7 @@ SLIDES = [
     ("domestic-news", "02. 国内主要ニュース"),
     ("global-news", "03. 海外主要ニュース"),
     ("markets", "04. 株価・指数"),
-    ("character", "05. GitHub CLI Guide"),
+    ("character", "05. Copilot Navigator"),
 ]
 
 DEFAULT_PLAYLIST = [key for key, _ in SLIDES]
@@ -327,7 +327,14 @@ def render_market_slide(market_rows: list[dict]) -> None:
     st.markdown(
         """
         <div class="feature-panel market-panel">
-            主要指数だけを大きく見せる構成に寄せ、短い視認時間でも変化量が読み取りやすいデザインにしています。
+            <div class="market-panel-copy">
+                主要指数を見やすく表示しています。`stooq` で十分な更新頻度が得られない場合は、運用では
+                <strong>Twelve Data</strong>、<strong>Alpha Vantage</strong>、<strong>Finnhub</strong>、
+                または証券会社/取引所提供APIへの切替が現実的です。
+            </div>
+            <div class="market-panel-copy subtle">
+                サイネージ用途では、厳密なティック配信よりも「5〜15分遅延の安定取得 + 明確な更新時刻表示」の方が運用しやすいです。
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -375,67 +382,105 @@ initialize_state()
 st.markdown(
     """
     <style>
+    .stApp, .stApp * {
+        font-family: "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+    }
     .stApp {
         background:
-            radial-gradient(circle at top left, rgba(103, 80, 164, 0.2), transparent 26%),
-            radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 22%),
-            linear-gradient(180deg, #050816 0%, #0a1020 100%);
+            radial-gradient(circle at top left, rgba(88, 28, 135, 0.22), transparent 24%),
+            radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 20%),
+            linear-gradient(180deg, #030712 0%, #070b16 100%);
     }
     .block-container {
         max-width: 1440px;
-        padding-top: 0.8rem;
+        padding-top: 0.55rem;
         padding-bottom: 1.5rem;
     }
     .hero {
-        padding: 16px 20px;
-        border-radius: 22px;
-        background: linear-gradient(135deg, rgba(10,16,32,0.92), rgba(15,23,42,0.78));
-        border: 1px solid rgba(125, 211, 252, 0.08);
-        box-shadow: 0 14px 34px rgba(0,0,0,0.22);
+        padding: 18px 20px;
+        border-radius: 18px;
+        background:
+            linear-gradient(180deg, rgba(6, 11, 22, 0.98), rgba(8, 13, 25, 0.96));
+        border: 1px solid rgba(96, 165, 250, 0.14);
+        box-shadow: 0 16px 38px rgba(0,0,0,0.28);
         margin-bottom: 14px;
+        position: relative;
+        overflow: hidden;
+    }
+    .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(90deg, rgba(34, 211, 238, 0.08), transparent 28%),
+            repeating-linear-gradient(180deg, rgba(148, 163, 184, 0.04) 0 1px, transparent 1px 28px);
+        pointer-events: none;
     }
     .hero-eyebrow, .eyebrow, .headline-index {
-        color: #7dd3fc;
+        color: #67e8f9;
         letter-spacing: 0.12em;
         font-size: 0.72rem;
         font-weight: 700;
     }
     .hero-title {
-        font-size: 1.55rem;
+        font-size: 1.3rem;
         font-weight: 800;
         margin-top: 0.22rem;
+        color: #e5f0ff;
     }
-    .hero-subtitle, .hero-meta, .meta-note, .headline-source, .guide-footer {
+    .hero-meta, .meta-note, .headline-source, .guide-footer {
         color: #a5b4cc;
     }
     .hero-meta {
         margin-top: 0.5rem;
-        font-size: 0.9rem;
+        font-size: 0.82rem;
+        line-height: 1.7;
+    }
+    .hero-terminal {
+        position: relative;
+        z-index: 1;
+    }
+    .hero-prompt {
+        color: #93c5fd;
+        font-size: 0.82rem;
+        margin-bottom: 0.25rem;
+    }
+    .hero-command {
+        color: #f8fafc;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+    .hero-lines {
+        margin-top: 0.7rem;
+        display: grid;
+        gap: 0.25rem;
+        color: #cbd5e1;
+        font-size: 0.84rem;
     }
     .feature-panel, .headline-card {
-        background: rgba(12, 18, 34, 0.92);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-        border-radius: 24px;
-        box-shadow: 0 14px 30px rgba(0,0,0,0.22);
+        background: rgba(8, 14, 28, 0.94);
+        border: 1px solid rgba(96, 165, 250, 0.1);
+        border-radius: 18px;
+        box-shadow: 0 14px 30px rgba(0,0,0,0.2);
     }
     .weather-panel {
         min-height: 310px;
-        padding: 28px;
-        background: linear-gradient(135deg, rgba(67, 56, 202, 0.82), rgba(12, 18, 34, 0.96));
+        padding: 24px;
+        background: linear-gradient(135deg, rgba(55, 48, 163, 0.76), rgba(8, 14, 28, 0.98));
     }
     .feature-location {
-        font-size: 1.15rem;
+        font-size: 1rem;
         color: #c4b5fd;
         margin-top: 0.6rem;
     }
     .feature-value {
-        font-size: 4.5rem;
+        font-size: 3.9rem;
         font-weight: 800;
         line-height: 1.08;
         margin-top: 0.5rem;
     }
     .feature-subtitle {
-        font-size: 1.1rem;
+        font-size: 0.98rem;
         color: #d8e3ff;
         margin-top: 0.6rem;
     }
@@ -460,11 +505,11 @@ st.markdown(
         font-weight: 600;
     }
     .headline-card {
-        padding: 18px 20px;
-        margin-bottom: 14px;
+        padding: 16px 18px;
+        margin-bottom: 12px;
     }
     .headline-title {
-        font-size: 1.22rem;
+        font-size: 1.06rem;
         font-weight: 700;
         margin-top: 8px;
         line-height: 1.45;
@@ -478,12 +523,20 @@ st.markdown(
         padding: 18px 20px;
         color: #d1d9e6;
     }
+    .market-panel-copy {
+        font-size: 0.9rem;
+        line-height: 1.7;
+    }
+    .market-panel-copy.subtle {
+        margin-top: 0.7rem;
+        color: #93a4bd;
+    }
     .guide-panel {
-        padding: 28px;
+        padding: 24px;
         min-height: 420px;
         background:
-            radial-gradient(circle at 22% 22%, rgba(139, 92, 246, 0.18), transparent 20%),
-            linear-gradient(135deg, rgba(10, 16, 32, 0.96), rgba(8, 16, 26, 0.98));
+            radial-gradient(circle at 22% 22%, rgba(139, 92, 246, 0.16), transparent 20%),
+            linear-gradient(135deg, rgba(6, 11, 22, 0.98), rgba(8, 16, 26, 0.98));
     }
     .guide-layout {
         display: flex;
@@ -569,31 +622,34 @@ st.markdown(
         flex: 1 1 auto;
     }
     .guide-title {
-        font-size: 1.55rem;
+        font-size: 1.3rem;
         font-weight: 800;
         margin-top: 0.35rem;
     }
     .guide-text {
         margin-top: 1rem;
-        font-size: 1rem;
+        font-size: 0.92rem;
         line-height: 1.85;
         color: #d8e3ff;
     }
     .guide-footer {
         margin-top: 1.2rem;
-        font-size: 0.9rem;
+        font-size: 0.82rem;
     }
     div[data-testid="stMetric"] {
-        background: rgba(12, 18, 34, 0.92);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-        padding: 14px;
-        border-radius: 18px;
+        background: rgba(8, 14, 28, 0.95);
+        border: 1px solid rgba(96, 165, 250, 0.08);
+        padding: 12px;
+        border-radius: 14px;
     }
     div[data-testid="stMetric"] label, div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
-        font-size: 0.8rem;
+        font-size: 0.72rem;
     }
     div[data-testid="stMetricValue"] {
-        font-size: 1.5rem;
+        font-size: 1.35rem;
+    }
+    .element-container div[data-testid="stProgress"] {
+        margin-top: 0.15rem;
     }
     @media (max-width: 980px) {
         .guide-layout {
@@ -604,7 +660,7 @@ st.markdown(
             flex-basis: auto;
         }
         .feature-value {
-            font-size: 3.6rem;
+            font-size: 3.1rem;
         }
     }
     </style>
@@ -683,29 +739,23 @@ market_rows = [
 st.markdown(
     f"""
     <div class="hero">
-        <div class="hero-eyebrow">COPILOT CLI STYLE</div>
-        <div class="hero-title">Digital Signage</div>
-        <div class="hero-meta">
-            NOW PLAYING: <strong>{escape(SLIDE_LABELS[current_slide])}</strong>
-            &nbsp;|&nbsp; NEXT: <strong>{escape(next_slide_label)}</strong>
-            &nbsp;|&nbsp; WEATHER: <strong>{escape(weather["area_label"])}</strong>
-            &nbsp;|&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        <div class="hero-terminal">
+            <div class="hero-eyebrow">COPILOT CLI STYLE</div>
+            <div class="hero-prompt">PS C:\\signage&gt;</div>
+            <div class="hero-command">gh copilot signage --theme geek --autoplay</div>
+            <div class="hero-lines">
+                <div>[status] now_playing={escape(SLIDE_LABELS[current_slide])}</div>
+                <div>[queue] next={escape(next_slide_label)} | weather={escape(weather["area_label"])}</div>
+                <div>[clock] {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
+            </div>
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-nav_left, nav_mid, nav_right = st.columns([1, 2, 1])
-with nav_left:
-    if st.button("◀ Previous", use_container_width=True):
-        move_slide(-1, playlist)
-with nav_mid:
-    st.progress(progress_ratio, text=f"再生リスト進行: {current_position + 1}/{len(playlist)}")
-    st.caption(" ▶ ".join(SLIDE_LABELS[key] for key in playlist))
-with nav_right:
-    if st.button("Next ▶", use_container_width=True):
-        move_slide(1, playlist)
+st.progress(progress_ratio, text=f"再生リスト進行: {current_position + 1}/{len(playlist)}")
+st.caption(" ▶ ".join(SLIDE_LABELS[key] for key in playlist))
 
 current_slide = st.session_state["signage_current_slide"]
 if current_slide == "weather":
