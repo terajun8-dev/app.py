@@ -19,9 +19,9 @@ st.set_page_config(page_title="Digital Signage", layout="wide")
 
 SLIDES = [
     ("weather", "01. 天気予報"),
-    ("domestic-news", "02. 国内主要ニュース"),
-    ("global-news", "03. 海外主要ニュース"),
-    ("markets", "04. 株価スナップショット"),
+    ("domestic-news", "02. Domestic News"),
+    ("global-news", "03. Global News"),
+    ("markets", "04. Market Snapshot"),
 ]
 
 DEFAULT_PLAYLIST = [key for key, _ in SLIDES]
@@ -105,17 +105,6 @@ def cached_fetch_text(url: str) -> str:
 
 def timestamp_now() -> str:
     return datetime.now().strftime("%H:%M:%S")
-
-
-def weather_text_art(description: str) -> str:
-    lowered = description.lower()
-    if "rain" in lowered or "雨" in description:
-        return "  .-.   \n (   ). \n(___(__)\n ' ' ' '\n' ' ' '"
-    if "cloud" in lowered or "くもり" in description:
-        return "   .--. \n.-(    ).\n(___.__)__\n         "
-    if "snow" in lowered or "雪" in description:
-        return "  .-.   \n (   ). \n(___(__)\n * * * *\n* * * * "
-    return " \\   /  \n  .-.   \n-(   )- \n  `-'   \n /   \\  "
 
 
 def build_area_label(payload: dict, fallback: str) -> str:
@@ -284,22 +273,18 @@ def render_status_badge(status: str, note: str, source: str, fetched_at: str) ->
 
 
 def render_weather_slide(weather: dict, location_status: str) -> None:
-    art = weather_text_art(weather["description"])
-    st.markdown("## 今日の天気")
+    st.markdown("## Weather")
     st.markdown(
         f"""
         <div class="feature-panel weather-panel compact-weather">
-            <div class="weather-grid">
-                <pre class="weather-art">{escape(art)}</pre>
-                <div class="weather-copy">
-                    <div class="eyebrow">LOCAL WEATHER</div>
-                    <div class="feature-location">{escape(weather["area_label"])}</div>
-                    <div class="weather-inline">
-                        <span class="feature-value">{escape(weather["temp_c"])}°C</span>
-                        <span class="feature-subtitle">{escape(weather["description"])}</span>
-                    </div>
-                    <div class="weather-meta">体感 {escape(weather["feels_like_c"])}°C / 湿度 {escape(weather["humidity"])}% / {escape(location_status)}</div>
+            <div class="weather-copy">
+                <div class="eyebrow">LOCAL WEATHER</div>
+                <div class="feature-location">{escape(weather["area_label"])}</div>
+                <div class="weather-inline">
+                    <span class="feature-value">{escape(weather["temp_c"])}°C</span>
+                    <span class="feature-subtitle">{escape(weather["description"])}</span>
                 </div>
+                <div class="weather-meta">Feels like {escape(weather["feels_like_c"])}°C / Humidity {escape(weather["humidity"])}% / {escape(location_status)}</div>
             </div>
         </div>
         """,
@@ -327,7 +312,7 @@ def render_news_slide(title: str, news_data: dict) -> None:
 
 
 def render_market_slide(market_rows: list[dict]) -> None:
-    st.markdown("## 株式指標")
+    st.markdown("## Market Snapshot")
     market_status = "snapshot"
     market_note = " / ".join(sorted({row["note"] for row in market_rows}))
     market_source = ", ".join(sorted({row["source"] for row in market_rows}))
@@ -352,9 +337,6 @@ def render_market_slide(market_rows: list[dict]) -> None:
         <div class="feature-panel market-panel">
             <div class="market-panel-copy">
                 Nikkei 225 / S&amp;P 500 / Dow Jones を定時スナップショットとして表示します。
-            </div>
-            <div class="market-panel-copy subtle">
-                より厳密な更新が必要なら Twelve Data / Alpha Vantage / Finnhub / 証券会社API への切替が候補です。
             </div>
         </div>
         """,
@@ -381,26 +363,6 @@ st.markdown(
         padding-top: 0.55rem;
         padding-bottom: 1.5rem;
     }
-    .hero {
-        padding: 14px 18px;
-        border-radius: 16px;
-        background:
-            linear-gradient(180deg, rgba(6, 11, 22, 0.98), rgba(8, 13, 25, 0.96));
-        border: 1px solid rgba(96, 165, 250, 0.14);
-        box-shadow: 0 14px 32px rgba(0,0,0,0.24);
-        margin-bottom: 12px;
-        position: relative;
-        overflow: hidden;
-    }
-    .hero::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background:
-            linear-gradient(90deg, rgba(34, 211, 238, 0.08), transparent 28%),
-            repeating-linear-gradient(180deg, rgba(148, 163, 184, 0.04) 0 1px, transparent 1px 28px);
-        pointer-events: none;
-    }
     .hero-eyebrow, .eyebrow, .headline-index {
         color: #67e8f9;
         letter-spacing: 0.12em;
@@ -409,35 +371,6 @@ st.markdown(
     }
     .meta-note, .headline-source {
         color: #a5b4cc;
-    }
-    .hero-terminal {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 14px;
-    }
-    .hero-brand {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .hero-mark {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #67e8f9, #8b5cf6);
-        box-shadow: 0 0 18px rgba(103, 232, 249, 0.45);
-    }
-    .hero-title {
-        color: #f8fafc;
-        font-size: 1rem;
-        font-weight: 700;
-    }
-    .hero-statusline {
-        color: #93a4bd;
-        font-size: 0.78rem;
     }
     .feature-panel, .headline-card {
         background: rgba(8, 14, 28, 0.94);
@@ -449,21 +382,6 @@ st.markdown(
         min-height: 220px;
         padding: 18px 20px;
         background: linear-gradient(135deg, rgba(55, 48, 163, 0.76), rgba(8, 14, 28, 0.98));
-    }
-    .compact-weather .weather-grid {
-        display: grid;
-        grid-template-columns: 140px 1fr;
-        gap: 20px;
-        align-items: center;
-    }
-    .weather-art {
-        margin: 0;
-        font-size: 1rem;
-        line-height: 1.1;
-        color: #e0e7ff;
-        background: rgba(15, 23, 42, 0.28);
-        border-radius: 12px;
-        padding: 12px;
     }
     .feature-location {
         font-size: 0.95rem;
@@ -572,10 +490,6 @@ st.markdown(
         font-size: 0.84rem;
         line-height: 1.65;
     }
-    .market-panel-copy.subtle {
-        margin-top: 0.7rem;
-        color: #93a4bd;
-    }
     div[data-testid="stMetric"] {
         background: rgba(8, 14, 28, 0.95);
         border: 1px solid rgba(96, 165, 250, 0.08);
@@ -592,13 +506,6 @@ st.markdown(
         margin-top: 0.15rem;
     }
     @media (max-width: 980px) {
-        .hero-terminal {
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        .compact-weather .weather-grid {
-            grid-template-columns: 1fr;
-        }
         .weather-inline {
             flex-direction: column;
             gap: 8px;
@@ -679,33 +586,12 @@ market_rows = [
     fetch_market_quote("^SPX", "S&P 500"),
 ]
 
-st.markdown(
-    f"""
-    <div class="hero">
-        <div class="hero-terminal">
-            <div class="hero-brand">
-                <div class="hero-mark"></div>
-                <div>
-                    <div class="hero-eyebrow">COPILOT CLI STYLE</div>
-                    <div class="hero-title">Digital Signage</div>
-                </div>
-            </div>
-            <div class="hero-statusline">{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | {escape(weather["area_label"])} | next: {escape(next_slide_label)}</div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.progress(progress_ratio, text=f"再生リスト進行: {current_position + 1}/{len(playlist)}")
-st.caption(" ▶ ".join(SLIDE_LABELS[key] for key in playlist))
-
 current_slide = st.session_state["signage_current_slide"]
 if current_slide == "weather":
     render_weather_slide(weather, location_status)
 elif current_slide == "domestic-news":
-    render_news_slide("国内主要ニュース", domestic_news)
+    render_news_slide("Domestic News", domestic_news)
 elif current_slide == "global-news":
-    render_news_slide("海外主要ニュース", global_news)
+    render_news_slide("Global News", global_news)
 else:
     render_market_slide(market_rows)
