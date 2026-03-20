@@ -29,17 +29,31 @@ SLIDES = [
 DEFAULT_PLAYLIST = [key for key, _ in SLIDES]
 SLIDE_LABELS = dict(SLIDES)
 USER_AGENT = "Mozilla/5.0 (compatible; MyStreamlitApp/1.0)"
-DEFAULT_MANUAL_LOCATION = "Tokyo"
+DEFAULT_MANUAL_LOCATION = "東京都"
 JST = timezone(timedelta(hours=9))
-CACHE_VERSION = "jst-cache-v2"
+CACHE_VERSION = "jma-weather-v1"
 TRANSLATION_CACHE_VERSION = "free-translate-v1"
+JMA_AREA_URL = "https://www.jma.go.jp/bosai/common/const/area.json"
+JMA_FORECAST_URL_TEMPLATE = "https://www.jma.go.jp/bosai/forecast/data/forecast/{office_code}.json"
+GSI_GEOCODE_URL_TEMPLATE = "https://msearch.gsi.go.jp/address-search/AddressSearch?q={query}"
+GSI_REVERSE_GEOCODE_URL_TEMPLATE = "https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat={lat}&lon={lon}"
+LOCATION_ALIASES = {
+    "tokyo": "東京都",
+    "osaka": "大阪府",
+    "yokohama": "横浜市",
+    "sapporo": "札幌市",
+    "nagoya": "名古屋市",
+    "kyoto": "京都府",
+    "kobe": "神戸市",
+    "fukuoka": "福岡市",
+}
 
 SAMPLE_WEATHER = {
-    "area_label": "Tokyo",
-    "temp_c": "18",
-    "feels_like_c": "17",
-    "humidity": "52",
+    "area_label": "東京都",
+    "summary": "晴れ",
     "description": "晴れ時々くもり",
+    "precipitation": "--",
+    "temp_range": "-- / --",
     "source": "sample",
     "status": "demo",
     "note": "ライブ天気データを取得できなかったため、サンプル表示です。",
@@ -160,49 +174,171 @@ def format_pub_date(pub_date_text: str) -> str:
         return pub_date_text[:16]
 
 
-def build_area_label(payload: dict, fallback: str) -> str:
-    nearest_areas = payload.get("nearest_area", [])
-    if not nearest_areas:
-        return fallback
-    nearest = nearest_areas[0]
-    region = nearest.get("region", [{}])[0].get("value", "").strip()
-    area_name = nearest.get("areaName", [{}])[0].get("value", "").strip()
-    country = nearest.get("country", [{}])[0].get("value", "").strip()
-    parts = [part for part in [region, area_name] if part]
-    if not parts and country:
-        parts.append(country)
-    return " / ".join(dict.fromkeys(parts)) or fallback
+def normalize_location_query(query: str) -> str:
+    stripped = query.strip()
+    if not stripped:
+        return DEFAULT_MANUAL_LOCATION
+    return LOCATION_ALIASES.get(stripped.lower(), stripped)
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def fetch_weather_by_query(query: str, fallback_label: str, fallback_note: str = "") -> dict:
+def load_jma_area_map() -> dict[str, dict[str, str]]:
+    payload = json.loads(cached_fetch_text(JMA_AREA_URL, CACHE_VERSION))
+    class10s = payload["class10s"]
+    class15s = payload["class15s"]
+    offices = payload["offices"]
+    municipality_map: dict[str, dict[str, str]] = {}
+    for class15_code, class15 in class15s.items():
+        class10_code = class15["parent"]
+        class10 = class10s[class10_code]
+        office_code = class10["parent"]
+        office = offices[office_code]
+        for municipality_code in class15["children"]:
+            municipality_map[municipality_code] = {
+                "office_code": office_code,
+                "office_name": office["name"],
+                "forecast_area_code": class10_code,
+                "forecast_area_name": class10["name"],
+                "local_area_name": class15["name"],
+            }
+    return municipality_map
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def geocode_location(query: str) -> dict:
+    normalized_query = normalize_location_query(query)
+    api_url = GSI_GEOCODE_URL_TEMPLATE.format(query=urllib.parse.quote(normalized_query))
+    payload = json.loads(cached_fetch_text(api_url, CACHE_VERSION))
+    if not payload:
+        raise ValueError("No geocoding result returned.")
+    first_result = payload[0]
+    longitude, latitude = first_result["geometry"]["coordinates"]
+    title = first_result.get("properties", {}).get("title", normalized_query).strip() or normalized_query
+    return {
+        "latitude": latitude,
+        "longitude": longitude,
+        "label": title,
+    }
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def reverse_geocode_location(latitude: float, longitude: float) -> dict:
+    api_url = GSI_REVERSE_GEOCODE_URL_TEMPLATE.format(lat=latitude, lon=longitude)
+    payload = json.loads(cached_fetch_text(api_url, CACHE_VERSION))
+    results = payload["results"]
+    municipality_code = results["muniCd"].strip()
+    local_name = results.get("lv01Nm", "").strip()
+    if not municipality_code:
+        raise ValueError("No municipality code returned.")
+    return {
+        "municipality_code": municipality_code,
+        "local_name": local_name,
+    }
+
+
+def first_non_empty(values: list[str]) -> str:
+    for value in values:
+        if value and value.strip():
+            return value.strip()
+    return "--"
+
+
+def resolve_municipality_key(area_map: dict[str, dict[str, str]], municipality_code: str) -> str:
+    candidates = [f"{municipality_code}00"]
+    if len(municipality_code) == 5:
+        candidates.append(f"{municipality_code[:4]}000")
+    for candidate in candidates:
+        if candidate in area_map:
+            return candidate
+    raise KeyError(f"No JMA area mapping for municipality code {municipality_code}.")
+
+
+def extract_temp_range(forecast_payload: list) -> str:
+    for report in forecast_payload:
+        for series in report.get("timeSeries", []):
+            areas = series.get("areas", [])
+            if not areas:
+                continue
+            for area in areas:
+                temps = area.get("temps")
+                if temps:
+                    non_empty = [temp for temp in temps if temp]
+                    if len(non_empty) >= 2:
+                        return f"{non_empty[0]} / {non_empty[1]}°C"
+                temps_min = area.get("tempsMin")
+                temps_max = area.get("tempsMax")
+                if temps_min and temps_max:
+                    min_temp = first_non_empty(temps_min)
+                    max_temp = first_non_empty(temps_max)
+                    if min_temp != "--" or max_temp != "--":
+                        return f"{min_temp} / {max_temp}°C"
+    return "-- / --"
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_weather_by_coords(latitude: float, longitude: float, fallback_label: str, fallback_note: str = "") -> dict:
     try:
-        encoded_query = urllib.parse.quote(query)
-        weather_url = f"https://wttr.in/{encoded_query}?format=j1"
-        payload = json.loads(cached_fetch_text(weather_url, CACHE_VERSION))
-        current = payload["current_condition"][0]
-        area_label = build_area_label(payload, fallback_label)
-        note = "ライブデータを表示中"
+        area_map = load_jma_area_map()
+        reverse_lookup = reverse_geocode_location(latitude, longitude)
+        municipality_key = resolve_municipality_key(area_map, reverse_lookup["municipality_code"])
+        area_info = area_map[municipality_key]
+        forecast_url = JMA_FORECAST_URL_TEMPLATE.format(office_code=area_info["office_code"])
+        forecast_payload = json.loads(cached_fetch_text(forecast_url, CACHE_VERSION))
+        today_report = forecast_payload[0]
+        weather_series = today_report["timeSeries"][0]
+        pop_series = today_report["timeSeries"][1]
+        weather_area = next(
+            area for area in weather_series["areas"] if area["area"]["code"] == area_info["forecast_area_code"]
+        )
+        pop_area = next(
+            area for area in pop_series["areas"] if area["area"]["code"] == area_info["forecast_area_code"]
+        )
+        description = weather_area["weathers"][0].strip()
+        summary = description.split("　")[0]
+        report_datetime = datetime.fromisoformat(today_report["reportDatetime"]).astimezone(JST).strftime("%H:%M")
+        note = f'気象庁予報を表示中 / 発表 {report_datetime}'
         if fallback_note:
             note = f"{note} / {fallback_note}"
+        area_label_parts = [part for part in [reverse_lookup["local_name"], area_info["forecast_area_name"]] if part]
         return {
-            "area_label": area_label,
-            "temp_c": current["temp_C"],
-            "feels_like_c": current["FeelsLikeC"],
-            "humidity": current["humidity"],
-            "description": current["weatherDesc"][0]["value"],
-            "source": "wttr.in",
+            "area_label": " / ".join(dict.fromkeys(area_label_parts)) or fallback_label,
+            "summary": summary,
+            "description": description,
+            "precipitation": first_non_empty(pop_area.get("pops", [])),
+            "temp_range": extract_temp_range(forecast_payload),
+            "source": "気象庁 forecast",
             "status": "live",
             "note": note,
             "fetched_at": timestamp_now(),
         }
-    except (HTTPError, URLError, TimeoutError, JSONDecodeError, KeyError, IndexError, UnicodeDecodeError) as exc:
+    except (HTTPError, URLError, TimeoutError, JSONDecodeError, KeyError, IndexError, UnicodeDecodeError, ValueError, StopIteration) as exc:
         fallback = SAMPLE_WEATHER.copy()
         fallback["area_label"] = fallback_label
         fallback_note_text = fallback["note"]
         if fallback_note:
             fallback_note_text = f"{fallback_note_text} / {fallback_note}"
         fallback["note"] = f"{fallback_note_text} ({exc.__class__.__name__})"
+        fallback["fetched_at"] = timestamp_now()
+        return fallback
+
+
+def fetch_weather_by_query(query: str, fallback_label: str, fallback_note: str = "") -> dict:
+    normalized_query = normalize_location_query(query)
+    try:
+        geocoded = geocode_location(normalized_query)
+        return fetch_weather_by_coords(
+            latitude=geocoded["latitude"],
+            longitude=geocoded["longitude"],
+            fallback_label=geocoded["label"] or fallback_label,
+            fallback_note=fallback_note,
+        )
+    except (HTTPError, URLError, TimeoutError, JSONDecodeError, KeyError, IndexError, UnicodeDecodeError, ValueError):
+        fallback = SAMPLE_WEATHER.copy()
+        fallback["area_label"] = normalized_query or fallback_label
+        fallback_note_text = fallback["note"]
+        if fallback_note:
+            fallback_note_text = f"{fallback_note_text} / {fallback_note}"
+        fallback["note"] = fallback_note_text
         fallback["fetched_at"] = timestamp_now()
         return fallback
 
@@ -215,8 +351,9 @@ def resolve_weather() -> tuple[dict, str]:
     use_current_location = st.session_state["signage_location_mode"] == "現在地を優先"
 
     if use_current_location and latitude is not None and longitude is not None:
-        weather = fetch_weather_by_query(
-            query=f"{latitude},{longitude}",
+        weather = fetch_weather_by_coords(
+            latitude=latitude,
+            longitude=longitude,
             fallback_label="現在地",
             fallback_note="ブラウザ位置情報を利用",
         )
@@ -367,10 +504,10 @@ def render_weather_slide(weather: dict, location_status: str) -> None:
                 <div class="eyebrow">LOCAL WEATHER</div>
                 <div class="feature-location">{escape(weather["area_label"])}</div>
                 <div class="weather-inline">
-                    <span class="feature-value">{escape(weather["temp_c"])}°C</span>
+                    <span class="feature-value">{escape(weather["summary"])}</span>
                     <span class="feature-subtitle">{escape(weather["description"])}</span>
                 </div>
-                <div class="weather-meta">Feels like {escape(weather["feels_like_c"])}°C / Humidity {escape(weather["humidity"])}% / {escape(location_status)}</div>
+                <div class="weather-meta">Rain {escape(weather["precipitation"])}% / Temp {escape(weather["temp_range"])} / {escape(location_status)}</div>
             </div>
         </div>
         """,
@@ -685,7 +822,7 @@ with st.sidebar:
     st.text_input(
         "地域名（都道府県 / 市区町村）",
         key="signage_manual_location",
-        help="例: Tokyo, Osaka, Yokohama, 北海道札幌市",
+        help="例: 東京都, 横浜市, 大阪府, 北海道札幌市, Tokyo, Osaka, Yokohama",
     )
     st.caption("位置情報が取得できれば現在地を優先し、未取得時は入力地域を使用します。")
 
