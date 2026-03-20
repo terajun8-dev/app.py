@@ -1,7 +1,6 @@
-import csv
 import email.utils
-import io
 import json
+import random
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from html import escape
@@ -22,7 +21,7 @@ SLIDES = [
     ("weather", "01. 天気予報"),
     ("domestic-news", "02. Domestic News"),
     ("global-news", "03. Global News"),
-    ("markets", "04. Market Snapshot"),
+    ("fun", "04. Fortune / Today"),
 ]
 
 DEFAULT_PLAYLIST = [key for key, _ in SLIDES]
@@ -56,10 +55,25 @@ SAMPLE_GLOBAL_NEWS = [
     {"title": "Shipping routes recover after weather delays", "source": "Demo World News", "link": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", "published_at": "--:--"},
 ]
 
-SAMPLE_MARKETS = [
-    {"name": "Nikkei 225", "symbol": "^N225", "close": 39120.45, "change": 215.30, "change_pct": 0.55},
-    {"name": "Dow Jones", "symbol": "^DJI", "close": 41120.10, "change": -95.40, "change_pct": -0.23},
-    {"name": "S&P 500", "symbol": "^SPX", "close": 5298.25, "change": 22.15, "change_pct": 0.42},
+ZODIAC_SIGNS = [
+    {"name": "牡羊座", "symbol": "Aries", "lucky": "新しい挑戦", "color": "Crimson", "message": "迷ったら先に一歩。勢いが運を引き寄せます。"},
+    {"name": "牡牛座", "symbol": "Taurus", "lucky": "お気に入りの音楽", "color": "Emerald", "message": "落ち着いた判断が光る日。丁寧さが評価につながります。"},
+    {"name": "双子座", "symbol": "Gemini", "lucky": "短いメモ", "color": "Sky Blue", "message": "情報運が高め。会話の中にヒントがありそうです。"},
+    {"name": "蟹座", "symbol": "Cancer", "lucky": "温かい飲み物", "color": "Silver", "message": "身近な人との連携が運気を押し上げます。"},
+    {"name": "獅子座", "symbol": "Leo", "lucky": "明るい挨拶", "color": "Gold", "message": "存在感が増す日。堂々とした表現が吉です。"},
+    {"name": "乙女座", "symbol": "Virgo", "lucky": "整理整頓", "color": "Mint", "message": "細部に気づける日。小さな修正が大きな成果に。"},
+    {"name": "天秤座", "symbol": "Libra", "lucky": "バランスの良い食事", "color": "Lavender", "message": "調整役としての魅力が高まります。中立な視点が鍵です。"},
+    {"name": "蠍座", "symbol": "Scorpio", "lucky": "静かな時間", "color": "Wine Red", "message": "集中力が冴える日。深く掘るほど収穫があります。"},
+    {"name": "射手座", "symbol": "Sagittarius", "lucky": "新しい記事", "color": "Royal Blue", "message": "視野を広げると流れが変わります。学びにツキあり。"},
+    {"name": "山羊座", "symbol": "Capricorn", "lucky": "チェックリスト", "color": "Charcoal", "message": "着実さが武器。段取りの良さがそのまま結果に。"},
+    {"name": "水瓶座", "symbol": "Aquarius", "lucky": "アイデアメモ", "color": "Cyan", "message": "ひらめきが冴える日。少し変化球の発想が当たりです。"},
+    {"name": "魚座", "symbol": "Pisces", "lucky": "やさしい言葉", "color": "Pearl", "message": "感受性が高まります。共感が流れをやわらかくします。"},
+]
+
+TODAY_FACT_FALLBACKS = [
+    "今日は『発明の日』。小さな工夫が大きな改善につながることを意識したい日です。",
+    "今日は『新しい習慣を始めるのに向いた日』。1つだけでも続けたいことを決めてみるのがおすすめです。",
+    "今日は『記録を見直す日』。過去のメモやログから次のヒントが見つかるかもしれません。",
 ]
 
 
@@ -243,38 +257,49 @@ def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, lim
         }
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def fetch_market_quote(symbol: str, name: str) -> dict:
+@st.cache_data(ttl=21600, show_spinner=False)
+def fetch_today_fact(month: int, day: int) -> dict:
     try:
-        quote_url = f"https://stooq.com/q/l/?s={urllib.parse.quote(symbol)}&i=d"
-        csv_text = cached_fetch_text(quote_url, CACHE_VERSION)
-        row = next(csv.DictReader(io.StringIO(csv_text)))
-        close_value = float(row["Close"])
-        open_value = float(row["Open"])
-        change_value = close_value - open_value
-        change_pct = (change_value / open_value) * 100 if open_value else 0.0
+        api_url = f"https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/events/{month}/{day}"
+        payload = json.loads(cached_fetch_text(api_url, CACHE_VERSION))
+        events = payload.get("events", [])
+        if not events:
+            raise ValueError("No on-this-day events returned.")
+        picked = random.choice(events[: min(len(events), 20)])
+        article_title = picked.get("pages", [{}])[0].get("normalizedtitle", "Wikipedia")
         return {
-            "name": name,
-            "symbol": symbol,
-            "close": close_value,
-            "change": change_value,
-            "change_pct": change_pct,
-            "source": "stooq daily snapshot",
-            "status": "snapshot",
-            "note": "直近取得できた定時指標を表示中",
+            "title": f"{picked.get('year', '--')}年の出来事",
+            "description": picked.get("text", "Today in history"),
+            "link": picked.get("pages", [{}])[0].get("content_urls", {}).get("desktop", {}).get("page", "https://en.wikipedia.org/wiki/Main_Page"),
+            "source": f"Wikimedia / {article_title}",
+            "status": "live",
+            "note": "今日は何の日を表示中",
             "fetched_at": timestamp_now(),
         }
-    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, KeyError, StopIteration, ValueError, ZeroDivisionError):
-        for fallback in SAMPLE_MARKETS:
-            if fallback["symbol"] == symbol:
-                return {
-                    **fallback,
-                    "source": "reference snapshot",
-                    "status": "snapshot",
-                    "note": "基準スナップショットを表示中",
-                    "fetched_at": timestamp_now(),
-                }
-        raise
+    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, JSONDecodeError, KeyError, IndexError, ValueError):
+        return {
+            "title": "今日は何の日",
+            "description": random.choice(TODAY_FACT_FALLBACKS),
+            "link": "https://en.wikipedia.org/wiki/Main_Page",
+            "source": "fallback",
+            "status": "demo",
+            "note": "履歴データ取得に失敗したため、固定メッセージを表示中",
+            "fetched_at": timestamp_now(),
+        }
+
+
+def build_fortune() -> dict:
+    sign = random.choice(ZODIAC_SIGNS)
+    return {
+        "title": f'{sign["name"]} / {sign["symbol"]}',
+        "description": sign["message"],
+        "lucky": sign["lucky"],
+        "color": sign["color"],
+        "source": "local fortune",
+        "status": "live",
+        "note": "ランダム星占いを表示中",
+        "fetched_at": timestamp_now(),
+    }
 
 
 def render_status_badge(status: str, note: str, source: str, fetched_at: str) -> None:
@@ -339,32 +364,17 @@ def render_news_slide(title: str, news_data: dict) -> None:
         )
 
 
-def render_market_slide(market_rows: list[dict]) -> None:
-    st.markdown("## Market Snapshot")
-    market_status = "snapshot"
-    market_note = " / ".join(sorted({row["note"] for row in market_rows}))
-    market_source = ", ".join(sorted({row["source"] for row in market_rows}))
-    market_updated = ", ".join(sorted({row["fetched_at"] for row in market_rows}))
-    render_status_badge(market_status, market_note, market_source, market_updated)
-    columns = st.columns(len(market_rows))
-    for column, row in zip(columns, market_rows):
-        delta_class = "up" if row["change"] >= 0 else "down"
-        column.markdown(
-            f"""
-            <div class="market-card">
-                <div class="eyebrow">{escape(row["symbol"])}</div>
-                <div class="market-name">{escape(row["name"])}</div>
-                <div class="market-close">{row["close"]:,.2f}</div>
-                <div class="market-delta {delta_class}">{row["change"]:+.2f} / {row["change_pct"]:+.2f}%</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+def render_fun_slide(fun_content: dict) -> None:
+    st.markdown(f'## {fun_content["heading"]}')
+    render_status_badge(fun_content["status"], fun_content["note"], fun_content["source"], fun_content["fetched_at"])
     st.markdown(
-        """
-        <div class="feature-panel market-panel">
+        f"""
+        <div class="feature-panel fun-panel">
+            <div class="eyebrow">{escape(fun_content["eyebrow"])}</div>
+            <div class="fun-title">{escape(fun_content["title"])}</div>
+            <div class="fun-description">{escape(fun_content["description"])}</div>
             <div class="market-panel-copy">
-                Nikkei 225 / S&amp;P 500 / Dow Jones を定時スナップショットとして表示します。
+                {escape(fun_content["footer"])}
             </div>
         </div>
         """,
@@ -520,6 +530,25 @@ st.markdown(
         padding: 14px 16px;
         color: #d1d9e6;
     }
+    .fun-panel {
+        margin-top: 14px;
+        padding: 18px 20px;
+        min-height: 220px;
+        background: linear-gradient(135deg, rgba(76, 29, 149, 0.72), rgba(8, 14, 28, 0.98));
+    }
+    .fun-title {
+        margin-top: 12px;
+        color: #f8fafc;
+        font-size: 1.65rem;
+        font-weight: 800;
+    }
+    .fun-description {
+        margin-top: 14px;
+        color: #dbeafe;
+        line-height: 1.8;
+        font-size: 0.98rem;
+        white-space: pre-wrap;
+    }
     .market-card {
         background: rgba(8, 14, 28, 0.95);
         border: 1px solid rgba(96, 165, 250, 0.1);
@@ -634,10 +663,6 @@ else:
 playlist = active_playlist()
 ensure_current_slide(playlist)
 current_slide = st.session_state["signage_current_slide"]
-current_position = playlist.index(current_slide)
-progress_ratio = (current_position + 1) / len(playlist)
-next_slide_label = SLIDE_LABELS[playlist[(current_position + 1) % len(playlist)]]
-
 weather, location_status = resolve_weather()
 domestic_news = fetch_rss_items(
     url="https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
@@ -651,11 +676,34 @@ global_news = fetch_rss_items(
     source_label="Google News World",
     limit=3,
 )
-market_rows = [
-    fetch_market_quote("^N225", "Nikkei 225"),
-    fetch_market_quote("^DJI", "Dow Jones"),
-    fetch_market_quote("^SPX", "S&P 500"),
-]
+today_fact = fetch_today_fact(datetime.now(JST).month, datetime.now(JST).day)
+fortune = build_fortune()
+fun_content = random.choice(
+    [
+        {
+            "heading": "Fortune",
+            "eyebrow": "RANDOM HOROSCOPE",
+            "title": fortune["title"],
+            "description": fortune["description"],
+            "footer": f'Lucky item: {fortune["lucky"]} / Lucky color: {fortune["color"]}',
+            "source": fortune["source"],
+            "status": fortune["status"],
+            "note": fortune["note"],
+            "fetched_at": fortune["fetched_at"],
+        },
+        {
+            "heading": "On This Day",
+            "eyebrow": "TODAY IN HISTORY",
+            "title": today_fact["title"],
+            "description": today_fact["description"],
+            "footer": f'Open: {today_fact["link"]}',
+            "source": today_fact["source"],
+            "status": today_fact["status"],
+            "note": today_fact["note"],
+            "fetched_at": today_fact["fetched_at"],
+        },
+    ]
+)
 
 current_slide = st.session_state["signage_current_slide"]
 if current_slide == "weather":
@@ -665,4 +713,4 @@ elif current_slide == "domestic-news":
 elif current_slide == "global-news":
     render_news_slide("Global News", global_news)
 else:
-    render_market_slide(market_rows)
+    render_fun_slide(fun_content)
