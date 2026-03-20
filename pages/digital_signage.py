@@ -3,7 +3,7 @@ import email.utils
 import io
 import json
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from html import escape
 from json import JSONDecodeError
 from urllib.error import HTTPError, URLError
@@ -29,6 +29,7 @@ DEFAULT_PLAYLIST = [key for key, _ in SLIDES]
 SLIDE_LABELS = dict(SLIDES)
 USER_AGENT = "Mozilla/5.0 (compatible; MyStreamlitApp/1.0)"
 DEFAULT_MANUAL_LOCATION = "Tokyo"
+JST = timezone(timedelta(hours=9))
 
 SAMPLE_WEATHER = {
     "area_label": "Tokyo",
@@ -110,14 +111,17 @@ def cached_fetch_rss_text(url: str) -> str:
 
 
 def timestamp_now() -> str:
-    return datetime.now().strftime("%H:%M:%S")
+    return datetime.now(JST).strftime("%H:%M:%S")
 
 
 def format_pub_date(pub_date_text: str) -> str:
     if not pub_date_text:
         return "--:--"
     try:
-        return email.utils.parsedate_to_datetime(pub_date_text).strftime("%H:%M")
+        parsed = email.utils.parsedate_to_datetime(pub_date_text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(JST).strftime("%H:%M")
     except (TypeError, ValueError, IndexError, OverflowError):
         return pub_date_text[:16]
 
