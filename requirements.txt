@@ -1,3 +1,6 @@
+streamlit
+streamlit-autorefresh
+streamlit-geolocation
 numpy
 numpy-financial
 pandas
