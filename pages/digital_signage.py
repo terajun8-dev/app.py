@@ -356,12 +356,25 @@ st.markdown(
         background:
             radial-gradient(circle at top left, rgba(88, 28, 135, 0.22), transparent 24%),
             radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 20%),
+            repeating-linear-gradient(180deg, rgba(148, 163, 184, 0.025) 0 1px, transparent 1px 28px),
             linear-gradient(180deg, #030712 0%, #070b16 100%);
     }
     .block-container {
         max-width: 1440px;
         padding-top: 0.55rem;
         padding-bottom: 1.5rem;
+    }
+    h2 {
+        margin-top: 0.2rem;
+        margin-bottom: 0.55rem;
+        color: #dff7ff;
+        font-size: 1.05rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    h2::before {
+        content: "> ";
+        color: #67e8f9;
     }
     .hero-eyebrow, .eyebrow, .headline-index {
         color: #67e8f9;
@@ -372,11 +385,30 @@ st.markdown(
     .meta-note, .headline-source {
         color: #a5b4cc;
     }
-    .feature-panel, .headline-card {
+    .feature-panel, .headline-card, .market-card {
         background: rgba(8, 14, 28, 0.94);
         border: 1px solid rgba(96, 165, 250, 0.1);
         border-radius: 18px;
         box-shadow: 0 14px 30px rgba(0,0,0,0.2);
+        position: relative;
+        overflow: hidden;
+    }
+    .feature-panel::before, .headline-card::before, .market-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(90deg, rgba(103, 232, 249, 0.06), transparent 24%),
+            repeating-linear-gradient(180deg, rgba(148, 163, 184, 0.03) 0 1px, transparent 1px 24px);
+        pointer-events: none;
+    }
+    .feature-panel::after, .headline-card::after, .market-card::after {
+        content: "";
+        position: absolute;
+        inset: 8px;
+        border: 1px solid rgba(103, 232, 249, 0.08);
+        border-radius: 12px;
+        pointer-events: none;
     }
     .weather-panel {
         min-height: 220px;
@@ -424,9 +456,12 @@ st.markdown(
         padding: 6px 12px;
         font-weight: 700;
         color: #04111f;
+        position: relative;
+        z-index: 1;
     }
     .meta-pill {
-        background: rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.88);
+        border: 1px solid rgba(103, 232, 249, 0.12);
         color: #dbeafe;
         font-weight: 600;
     }
@@ -450,6 +485,7 @@ st.markdown(
     .headline-source {
         margin-top: 6px;
         font-size: 0.78rem;
+        letter-spacing: 0.04em;
     }
     .market-panel {
         margin-top: 14px;
@@ -468,6 +504,7 @@ st.markdown(
         color: #dbeafe;
         font-size: 1rem;
         font-weight: 700;
+        letter-spacing: 0.04em;
     }
     .market-close {
         margin-top: 12px;
@@ -489,6 +526,8 @@ st.markdown(
     .market-panel-copy {
         font-size: 0.84rem;
         line-height: 1.65;
+        position: relative;
+        z-index: 1;
     }
     div[data-testid="stMetric"] {
         background: rgba(8, 14, 28, 0.95);
@@ -504,6 +543,10 @@ st.markdown(
     }
     .element-container div[data-testid="stProgress"] {
         margin-top: 0.15rem;
+    }
+    .stMarkdown {
+        position: relative;
+        z-index: 1;
     }
     @media (max-width: 980px) {
         .weather-inline {
