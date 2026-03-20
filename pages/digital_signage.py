@@ -30,6 +30,7 @@ SLIDE_LABELS = dict(SLIDES)
 USER_AGENT = "Mozilla/5.0 (compatible; MyStreamlitApp/1.0)"
 DEFAULT_MANUAL_LOCATION = "Tokyo"
 JST = timezone(timedelta(hours=9))
+CACHE_VERSION = "jst-cache-v2"
 
 SAMPLE_WEATHER = {
     "area_label": "Tokyo",
@@ -101,12 +102,12 @@ def fetch_text(url: str) -> str:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def cached_fetch_text(url: str) -> str:
+def cached_fetch_text(url: str, cache_version: str) -> str:
     return fetch_text(url)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def cached_fetch_rss_text(url: str) -> str:
+def cached_fetch_rss_text(url: str, cache_version: str) -> str:
     return fetch_text(url)
 
 
@@ -145,7 +146,7 @@ def fetch_weather_by_query(query: str, fallback_label: str, fallback_note: str =
     try:
         encoded_query = urllib.parse.quote(query)
         weather_url = f"https://wttr.in/{encoded_query}?format=j1"
-        payload = json.loads(cached_fetch_text(weather_url))
+        payload = json.loads(cached_fetch_text(weather_url, CACHE_VERSION))
         current = payload["current_condition"][0]
         area_label = build_area_label(payload, fallback_label)
         note = "ライブデータを表示中"
@@ -207,7 +208,7 @@ def resolve_weather() -> tuple[dict, str]:
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, limit: int) -> dict:
     try:
-        xml_text = cached_fetch_rss_text(url)
+        xml_text = cached_fetch_rss_text(url, CACHE_VERSION)
         root = ET.fromstring(xml_text)
         parsed_items = []
         for item in root.findall(".//item")[:limit]:
@@ -246,7 +247,7 @@ def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, lim
 def fetch_market_quote(symbol: str, name: str) -> dict:
     try:
         quote_url = f"https://stooq.com/q/l/?s={urllib.parse.quote(symbol)}&i=d"
-        csv_text = cached_fetch_text(quote_url)
+        csv_text = cached_fetch_text(quote_url, CACHE_VERSION)
         row = next(csv.DictReader(io.StringIO(csv_text)))
         close_value = float(row["Close"])
         open_value = float(row["Open"])
