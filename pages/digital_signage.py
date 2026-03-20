@@ -1,4 +1,5 @@
 import csv
+import email.utils
 import io
 import json
 import urllib.parse
@@ -42,15 +43,15 @@ SAMPLE_WEATHER = {
 }
 
 SAMPLE_DOMESTIC_NEWS = [
-    {"title": "政府、来年度の成長戦略を発表", "source": "Demo News JP", "link": "https://www3.nhk.or.jp/news/"},
-    {"title": "主要都市で春のイベント準備が本格化", "source": "Demo News JP", "link": "https://www3.nhk.or.jp/news/"},
-    {"title": "国内製造業の景況感が緩やかに改善", "source": "Demo News JP", "link": "https://www3.nhk.or.jp/news/"},
+    {"title": "政府、来年度の成長戦略を発表", "source": "Demo News JP", "link": "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja", "published_at": "--:--"},
+    {"title": "主要都市で春のイベント準備が本格化", "source": "Demo News JP", "link": "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja", "published_at": "--:--"},
+    {"title": "国内製造業の景況感が緩やかに改善", "source": "Demo News JP", "link": "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja", "published_at": "--:--"},
 ]
 
 SAMPLE_GLOBAL_NEWS = [
-    {"title": "Global markets await central bank signals", "source": "Demo World News", "link": "https://www.bbc.com/news/world"},
-    {"title": "Major cities expand clean-energy projects", "source": "Demo World News", "link": "https://www.bbc.com/news/world"},
-    {"title": "Shipping routes recover after weather delays", "source": "Demo World News", "link": "https://www.bbc.com/news/world"},
+    {"title": "Global markets await central bank signals", "source": "Demo World News", "link": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", "published_at": "--:--"},
+    {"title": "Major cities expand clean-energy projects", "source": "Demo World News", "link": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", "published_at": "--:--"},
+    {"title": "Shipping routes recover after weather delays", "source": "Demo World News", "link": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", "published_at": "--:--"},
 ]
 
 SAMPLE_MARKETS = [
@@ -103,8 +104,22 @@ def cached_fetch_text(url: str) -> str:
     return fetch_text(url)
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_fetch_rss_text(url: str) -> str:
+    return fetch_text(url)
+
+
 def timestamp_now() -> str:
     return datetime.now().strftime("%H:%M:%S")
+
+
+def format_pub_date(pub_date_text: str) -> str:
+    if not pub_date_text:
+        return "--:--"
+    try:
+        return email.utils.parsedate_to_datetime(pub_date_text).strftime("%H:%M")
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return pub_date_text[:16]
 
 
 def build_area_label(payload: dict, fallback: str) -> str:
@@ -185,24 +200,32 @@ def resolve_weather() -> tuple[dict, str]:
     return weather, "手動地域"
 
 
-@st.cache_data(ttl=900, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, limit: int) -> dict:
     try:
-        xml_text = cached_fetch_text(url)
+        xml_text = cached_fetch_rss_text(url)
         root = ET.fromstring(xml_text)
         parsed_items = []
         for item in root.findall(".//item")[:limit]:
             title = item.findtext("title", default="(no title)")
             source = item.findtext("source", default=source_label)
             link = item.findtext("link", default=url)
-            parsed_items.append({"title": title.strip(), "source": source.strip(), "link": link.strip()})
+            pub_date = item.findtext("pubDate", default="")
+            parsed_items.append(
+                {
+                    "title": title.strip(),
+                    "source": source.strip(),
+                    "link": link.strip(),
+                    "published_at": format_pub_date(pub_date.strip()),
+                }
+            )
         if not parsed_items:
             raise ValueError("RSS feed returned no items.")
         return {
             "items": parsed_items,
             "source": source_label,
             "status": "live",
-            "note": "ライブRSSを表示中",
+            "note": "ニュースは約5分ごとに更新",
             "fetched_at": timestamp_now(),
         }
     except (HTTPError, URLError, TimeoutError, ET.ParseError, UnicodeDecodeError, ValueError) as exc:
@@ -304,7 +327,7 @@ def render_news_slide(title: str, news_data: dict) -> None:
                 <div class="headline-title">
                     <a href="{escape(item["link"])}" target="_blank" rel="noopener noreferrer">{escape(item["title"])}</a>
                 </div>
-                <div class="headline-source">{escape(item["source"])}</div>
+                <div class="headline-source">{escape(item["published_at"])} / {escape(item["source"])}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -612,15 +635,15 @@ next_slide_label = SLIDE_LABELS[playlist[(current_position + 1) % len(playlist)]
 
 weather, location_status = resolve_weather()
 domestic_news = fetch_rss_items(
-    url="https://www3.nhk.or.jp/rss/news/cat0.xml",
+    url="https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
     fallback_items=SAMPLE_DOMESTIC_NEWS,
-    source_label="NHK RSS",
+    source_label="Google News JP",
     limit=3,
 )
 global_news = fetch_rss_items(
-    url="https://feeds.bbci.co.uk/news/world/rss.xml",
+    url="https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en",
     fallback_items=SAMPLE_GLOBAL_NEWS,
-    source_label="BBC World RSS",
+    source_label="Google News World",
     limit=3,
 )
 market_rows = [
