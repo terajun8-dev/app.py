@@ -336,29 +336,32 @@ def render_market_slide(market_rows: list[dict]) -> None:
 
 def render_character_slide(weather: dict) -> None:
     quote_lines = [
-        "こんにちは。最新情報を順番にお届けします。",
+        "Navigator が次の情報へスムーズに案内します。",
         f'現在の天気は {weather["area_label"]} で {weather["temp_c"]}°C です。',
-        "GitHub CLI をイメージした案内キャラクターが画面進行をサポートします。",
+        "Copilot Pro CLI を思わせる案内役として設計しています。",
     ]
-    st.markdown("## GitHub CLI Guide")
+    st.markdown("## Copilot Navigator")
     st.markdown(
         f"""
         <div class="feature-panel guide-panel">
             <div class="guide-layout">
                 <div class="guide-character">
-                    <div class="guide-shell">
-                        <div class="guide-screen">
-                            <span class="guide-tag">gh</span>
-                            <span class="guide-face">&gt;_</span>
+                    <div class="navigator-shell">
+                        <div class="navigator-orbit orbit-a"></div>
+                        <div class="navigator-orbit orbit-b"></div>
+                        <div class="navigator-core">
+                            <div class="navigator-eye"></div>
+                            <div class="navigator-eye"></div>
+                            <div class="navigator-smile"></div>
                         </div>
-                        <div class="guide-body">CLI GUIDE</div>
+                        <div class="navigator-badge">NAV</div>
                     </div>
                 </div>
                 <div class="guide-copy">
-                    <div class="eyebrow">GITHUB CLI INSPIRED</div>
-                    <div class="guide-title">オリジナル案内キャラクター</div>
+                    <div class="eyebrow">COPILOT PRO CLI MOTIF</div>
+                    <div class="guide-title">Navigator guide</div>
                     <div class="guide-text">{"<br>".join(escape(line) for line in quote_lines)}</div>
-                    <div class="guide-footer">本番では PNG / GIF / Lottie に差し替えて、さらに表情やモーションを足せます。</div>
+                    <div class="guide-footer">将来的には PNG / GIF / Lottie へ差し替えて、モーションをさらに強化できます。</div>
                 </div>
             </div>
         </div>
@@ -374,65 +377,66 @@ st.markdown(
     <style>
     .stApp {
         background:
-            radial-gradient(circle at top left, rgba(59, 130, 246, 0.22), transparent 28%),
-            radial-gradient(circle at top right, rgba(20, 184, 166, 0.18), transparent 24%),
-            linear-gradient(180deg, #06131f 0%, #08101a 100%);
+            radial-gradient(circle at top left, rgba(103, 80, 164, 0.2), transparent 26%),
+            radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 22%),
+            linear-gradient(180deg, #050816 0%, #0a1020 100%);
     }
     .block-container {
         max-width: 1440px;
-        padding-top: 1.2rem;
+        padding-top: 0.8rem;
         padding-bottom: 1.5rem;
     }
     .hero {
-        padding: 24px 28px;
-        border-radius: 28px;
-        background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(17,24,39,0.88));
-        border: 1px solid rgba(148,163,184,0.18);
-        box-shadow: 0 18px 48px rgba(0,0,0,0.32);
-        margin-bottom: 18px;
+        padding: 16px 20px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(10,16,32,0.92), rgba(15,23,42,0.78));
+        border: 1px solid rgba(125, 211, 252, 0.08);
+        box-shadow: 0 14px 34px rgba(0,0,0,0.22);
+        margin-bottom: 14px;
     }
     .hero-eyebrow, .eyebrow, .headline-index {
-        color: #38bdf8;
+        color: #7dd3fc;
         letter-spacing: 0.12em;
-        font-size: 0.82rem;
+        font-size: 0.72rem;
         font-weight: 700;
     }
     .hero-title {
-        font-size: 2.4rem;
+        font-size: 1.55rem;
         font-weight: 800;
-        margin-top: 0.3rem;
+        margin-top: 0.22rem;
     }
     .hero-subtitle, .hero-meta, .meta-note, .headline-source, .guide-footer {
         color: #a5b4cc;
     }
     .hero-meta {
-        margin-top: 0.8rem;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
     }
     .feature-panel, .headline-card {
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: rgba(12, 18, 34, 0.92);
+        border: 1px solid rgba(148, 163, 184, 0.12);
         border-radius: 24px;
-        box-shadow: 0 16px 36px rgba(0,0,0,0.26);
+        box-shadow: 0 14px 30px rgba(0,0,0,0.22);
     }
     .weather-panel {
         min-height: 310px;
         padding: 28px;
-        background: linear-gradient(135deg, rgba(30, 64, 175, 0.9), rgba(15, 23, 42, 0.95));
+        background: linear-gradient(135deg, rgba(67, 56, 202, 0.82), rgba(12, 18, 34, 0.96));
     }
     .feature-location {
-        font-size: 1.45rem;
-        color: #bfdbfe;
+        font-size: 1.15rem;
+        color: #c4b5fd;
         margin-top: 0.6rem;
     }
     .feature-value {
-        font-size: 5.4rem;
+        font-size: 4.5rem;
         font-weight: 800;
         line-height: 1.08;
         margin-top: 0.5rem;
     }
     .feature-subtitle {
-        font-size: 1.45rem;
-        color: #dbeafe;
+        font-size: 1.1rem;
+        color: #d8e3ff;
         margin-top: 0.6rem;
     }
     .status-row {
@@ -460,13 +464,14 @@ st.markdown(
         margin-bottom: 14px;
     }
     .headline-title {
-        font-size: 1.55rem;
+        font-size: 1.22rem;
         font-weight: 700;
         margin-top: 8px;
         line-height: 1.45;
     }
     .headline-source {
         margin-top: 10px;
+        font-size: 0.88rem;
     }
     .market-panel {
         margin-top: 18px;
@@ -477,8 +482,8 @@ st.markdown(
         padding: 28px;
         min-height: 420px;
         background:
-            radial-gradient(circle at 22% 22%, rgba(56, 189, 248, 0.18), transparent 20%),
-            linear-gradient(135deg, rgba(17, 24, 39, 0.96), rgba(8, 16, 26, 0.98));
+            radial-gradient(circle at 22% 22%, rgba(139, 92, 246, 0.18), transparent 20%),
+            linear-gradient(135deg, rgba(10, 16, 32, 0.96), rgba(8, 16, 26, 0.98));
     }
     .guide-layout {
         display: flex;
@@ -491,78 +496,104 @@ st.markdown(
         display: flex;
         justify-content: center;
     }
-    .guide-shell {
-        width: 240px;
-        height: 290px;
-        border-radius: 34px;
-        background: linear-gradient(180deg, #111827, #0f172a);
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.34);
-        padding: 24px;
+    .navigator-shell {
+        width: 250px;
+        height: 250px;
+        border-radius: 50%;
         position: relative;
-    }
-    .guide-shell::before {
-        content: "";
-        position: absolute;
-        inset: 14px 14px auto 14px;
-        height: 120px;
-        border-radius: 24px;
-        background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.08));
-        border: 1px solid rgba(56, 189, 248, 0.18);
-    }
-    .guide-screen {
-        position: relative;
-        z-index: 1;
+        background: radial-gradient(circle at 30% 30%, rgba(96, 165, 250, 0.22), rgba(15, 23, 42, 0.98));
+        border: 1px solid rgba(125, 211, 252, 0.18);
+        box-shadow: 0 20px 42px rgba(0,0,0,0.34);
         display: flex;
-        gap: 10px;
         align-items: center;
         justify-content: center;
+    }
+    .navigator-orbit {
+        position: relative;
+        position: absolute;
+        inset: 18px;
+        border-radius: 50%;
+        border: 1px solid rgba(125, 211, 252, 0.16);
+    }
+    .orbit-a {
+        transform: rotate(24deg);
+    }
+    .orbit-b {
+        inset: 36px;
+        transform: rotate(-18deg);
+        border-color: rgba(167, 139, 250, 0.2);
+    }
+    .navigator-core {
+        width: 120px;
         height: 120px;
-        font-size: 2.3rem;
-        font-weight: 800;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #60a5fa, #8b5cf6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        position: relative;
+        box-shadow: 0 10px 24px rgba(59, 130, 246, 0.28);
     }
-    .guide-tag {
-        color: #38bdf8;
+    .navigator-eye {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #f8fafc;
+        margin-top: -8px;
     }
-    .guide-face {
-        color: #f8fafc;
-    }
-    .guide-body {
+    .navigator-smile {
+        position: relative;
         position: absolute;
         bottom: 28px;
-        left: 24px;
-        right: 24px;
+        width: 36px;
+        height: 18px;
+        border-bottom: 3px solid #f8fafc;
+        border-radius: 0 0 18px 18px;
+    }
+    .navigator-badge {
+        position: absolute;
+        bottom: 24px;
+        right: 18px;
         text-align: center;
-        border-radius: 18px;
-        padding: 14px 12px;
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
-        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: rgba(15, 23, 42, 0.92);
+        border: 1px solid rgba(125, 211, 252, 0.2);
         color: #e2e8f0;
         font-weight: 700;
-        letter-spacing: 0.18em;
+        font-size: 0.82rem;
+        letter-spacing: 0.12em;
     }
     .guide-copy {
         flex: 1 1 auto;
     }
     .guide-title {
-        font-size: 2.2rem;
+        font-size: 1.55rem;
         font-weight: 800;
         margin-top: 0.35rem;
     }
     .guide-text {
         margin-top: 1rem;
-        font-size: 1.2rem;
-        line-height: 1.8;
-        color: #dbeafe;
+        font-size: 1rem;
+        line-height: 1.85;
+        color: #d8e3ff;
     }
     .guide-footer {
         margin-top: 1.2rem;
+        font-size: 0.9rem;
     }
     div[data-testid="stMetric"] {
-        background: rgba(15, 23, 42, 0.92);
-        border: 1px solid rgba(148, 163, 184, 0.14);
-        padding: 16px;
-        border-radius: 20px;
+        background: rgba(12, 18, 34, 0.92);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        padding: 14px;
+        border-radius: 18px;
+    }
+    div[data-testid="stMetric"] label, div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        font-size: 0.8rem;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 1.5rem;
     }
     @media (max-width: 980px) {
         .guide-layout {
@@ -573,7 +604,7 @@ st.markdown(
             flex-basis: auto;
         }
         .feature-value {
-            font-size: 4.2rem;
+            font-size: 3.6rem;
         }
     }
     </style>
@@ -652,9 +683,8 @@ market_rows = [
 st.markdown(
     f"""
     <div class="hero">
-        <div class="hero-eyebrow">DIGITAL SIGNAGE</div>
-        <div class="hero-title">情報ボード</div>
-        <div class="hero-subtitle">天気、国内外ニュース、主要指数、GitHub CLI ガイド演出を自動で巡回表示します。</div>
+        <div class="hero-eyebrow">COPILOT CLI STYLE</div>
+        <div class="hero-title">Digital Signage</div>
         <div class="hero-meta">
             NOW PLAYING: <strong>{escape(SLIDE_LABELS[current_slide])}</strong>
             &nbsp;|&nbsp; NEXT: <strong>{escape(next_slide_label)}</strong>
