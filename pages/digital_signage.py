@@ -21,8 +21,7 @@ SLIDES = [
     ("weather", "01. 天気予報"),
     ("domestic-news", "02. 国内主要ニュース"),
     ("global-news", "03. 海外主要ニュース"),
-    ("markets", "04. 株価・指数"),
-    ("character", "05. Copilot Navigator"),
+    ("markets", "04. 株価スナップショット"),
 ]
 
 DEFAULT_PLAYLIST = [key for key, _ in SLIDES]
@@ -341,42 +340,6 @@ def render_market_slide(market_rows: list[dict]) -> None:
     )
 
 
-def render_character_slide(weather: dict) -> None:
-    quote_lines = [
-        "Navigator が次の情報へスムーズに案内します。",
-        f'現在の天気は {weather["area_label"]} で {weather["temp_c"]}°C です。',
-        "Copilot Pro CLI を思わせる案内役として設計しています。",
-    ]
-    st.markdown("## Copilot Navigator")
-    st.markdown(
-        f"""
-        <div class="feature-panel guide-panel">
-            <div class="guide-layout">
-                <div class="guide-character">
-                    <div class="navigator-shell">
-                        <div class="navigator-orbit orbit-a"></div>
-                        <div class="navigator-orbit orbit-b"></div>
-                        <div class="navigator-core">
-                            <div class="navigator-eye"></div>
-                            <div class="navigator-eye"></div>
-                            <div class="navigator-smile"></div>
-                        </div>
-                        <div class="navigator-badge">NAV</div>
-                    </div>
-                </div>
-                <div class="guide-copy">
-                    <div class="eyebrow">COPILOT PRO CLI MOTIF</div>
-                    <div class="guide-title">Navigator guide</div>
-                    <div class="guide-text">{"<br>".join(escape(line) for line in quote_lines)}</div>
-                    <div class="guide-footer">将来的には PNG / GIF / Lottie へ差し替えて、モーションをさらに強化できます。</div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 initialize_state()
 
 st.markdown(
@@ -397,13 +360,13 @@ st.markdown(
         padding-bottom: 1.5rem;
     }
     .hero {
-        padding: 18px 20px;
-        border-radius: 18px;
+        padding: 14px 18px;
+        border-radius: 16px;
         background:
             linear-gradient(180deg, rgba(6, 11, 22, 0.98), rgba(8, 13, 25, 0.96));
         border: 1px solid rgba(96, 165, 250, 0.14);
-        box-shadow: 0 16px 38px rgba(0,0,0,0.28);
-        margin-bottom: 14px;
+        box-shadow: 0 14px 32px rgba(0,0,0,0.24);
+        margin-bottom: 12px;
         position: relative;
         overflow: hidden;
     }
@@ -422,40 +385,37 @@ st.markdown(
         font-size: 0.72rem;
         font-weight: 700;
     }
-    .hero-title {
-        font-size: 1.3rem;
-        font-weight: 800;
-        margin-top: 0.22rem;
-        color: #e5f0ff;
-    }
-    .hero-meta, .meta-note, .headline-source, .guide-footer {
+    .meta-note, .headline-source {
         color: #a5b4cc;
-    }
-    .hero-meta {
-        margin-top: 0.5rem;
-        font-size: 0.82rem;
-        line-height: 1.7;
     }
     .hero-terminal {
         position: relative;
         z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
     }
-    .hero-prompt {
-        color: #93c5fd;
-        font-size: 0.82rem;
-        margin-bottom: 0.25rem;
+    .hero-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
-    .hero-command {
+    .hero-mark {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #67e8f9, #8b5cf6);
+        box-shadow: 0 0 18px rgba(103, 232, 249, 0.45);
+    }
+    .hero-title {
         color: #f8fafc;
         font-size: 1rem;
         font-weight: 700;
     }
-    .hero-lines {
-        margin-top: 0.7rem;
-        display: grid;
-        gap: 0.25rem;
-        color: #cbd5e1;
-        font-size: 0.84rem;
+    .hero-statusline {
+        color: #93a4bd;
+        font-size: 0.78rem;
     }
     .feature-panel, .headline-card {
         background: rgba(8, 14, 28, 0.94);
@@ -531,111 +491,6 @@ st.markdown(
         margin-top: 0.7rem;
         color: #93a4bd;
     }
-    .guide-panel {
-        padding: 24px;
-        min-height: 420px;
-        background:
-            radial-gradient(circle at 22% 22%, rgba(139, 92, 246, 0.16), transparent 20%),
-            linear-gradient(135deg, rgba(6, 11, 22, 0.98), rgba(8, 16, 26, 0.98));
-    }
-    .guide-layout {
-        display: flex;
-        gap: 32px;
-        align-items: center;
-        min-height: 360px;
-    }
-    .guide-character {
-        flex: 0 0 34%;
-        display: flex;
-        justify-content: center;
-    }
-    .navigator-shell {
-        width: 250px;
-        height: 250px;
-        border-radius: 50%;
-        position: relative;
-        background: radial-gradient(circle at 30% 30%, rgba(96, 165, 250, 0.22), rgba(15, 23, 42, 0.98));
-        border: 1px solid rgba(125, 211, 252, 0.18);
-        box-shadow: 0 20px 42px rgba(0,0,0,0.34);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .navigator-orbit {
-        position: relative;
-        position: absolute;
-        inset: 18px;
-        border-radius: 50%;
-        border: 1px solid rgba(125, 211, 252, 0.16);
-    }
-    .orbit-a {
-        transform: rotate(24deg);
-    }
-    .orbit-b {
-        inset: 36px;
-        transform: rotate(-18deg);
-        border-color: rgba(167, 139, 250, 0.2);
-    }
-    .navigator-core {
-        width: 120px;
-        height: 120px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #60a5fa, #8b5cf6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        position: relative;
-        box-shadow: 0 10px 24px rgba(59, 130, 246, 0.28);
-    }
-    .navigator-eye {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #f8fafc;
-        margin-top: -8px;
-    }
-    .navigator-smile {
-        position: relative;
-        position: absolute;
-        bottom: 28px;
-        width: 36px;
-        height: 18px;
-        border-bottom: 3px solid #f8fafc;
-        border-radius: 0 0 18px 18px;
-    }
-    .navigator-badge {
-        position: absolute;
-        bottom: 24px;
-        right: 18px;
-        text-align: center;
-        border-radius: 999px;
-        padding: 6px 10px;
-        background: rgba(15, 23, 42, 0.92);
-        border: 1px solid rgba(125, 211, 252, 0.2);
-        color: #e2e8f0;
-        font-weight: 700;
-        font-size: 0.82rem;
-        letter-spacing: 0.12em;
-    }
-    .guide-copy {
-        flex: 1 1 auto;
-    }
-    .guide-title {
-        font-size: 1.3rem;
-        font-weight: 800;
-        margin-top: 0.35rem;
-    }
-    .guide-text {
-        margin-top: 1rem;
-        font-size: 0.92rem;
-        line-height: 1.85;
-        color: #d8e3ff;
-    }
-    .guide-footer {
-        margin-top: 1.2rem;
-        font-size: 0.82rem;
-    }
     div[data-testid="stMetric"] {
         background: rgba(8, 14, 28, 0.95);
         border: 1px solid rgba(96, 165, 250, 0.08);
@@ -652,12 +507,9 @@ st.markdown(
         margin-top: 0.15rem;
     }
     @media (max-width: 980px) {
-        .guide-layout {
+        .hero-terminal {
             flex-direction: column;
-            align-items: stretch;
-        }
-        .guide-character {
-            flex-basis: auto;
+            align-items: flex-start;
         }
         .feature-value {
             font-size: 3.1rem;
@@ -740,14 +592,14 @@ st.markdown(
     f"""
     <div class="hero">
         <div class="hero-terminal">
-            <div class="hero-eyebrow">COPILOT CLI STYLE</div>
-            <div class="hero-prompt">PS C:\\signage&gt;</div>
-            <div class="hero-command">gh copilot signage --theme geek --autoplay</div>
-            <div class="hero-lines">
-                <div>[status] now_playing={escape(SLIDE_LABELS[current_slide])}</div>
-                <div>[queue] next={escape(next_slide_label)} | weather={escape(weather["area_label"])}</div>
-                <div>[clock] {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
+            <div class="hero-brand">
+                <div class="hero-mark"></div>
+                <div>
+                    <div class="hero-eyebrow">COPILOT CLI STYLE</div>
+                    <div class="hero-title">Digital Signage</div>
+                </div>
             </div>
+            <div class="hero-statusline">{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | {escape(weather["area_label"])} | next: {escape(next_slide_label)}</div>
         </div>
     </div>
     """,
@@ -764,7 +616,5 @@ elif current_slide == "domestic-news":
     render_news_slide("国内主要ニュース", domestic_news)
 elif current_slide == "global-news":
     render_news_slide("海外主要ニュース", global_news)
-elif current_slide == "markets":
-    render_market_slide(market_rows)
 else:
-    render_character_slide(weather)
+    render_market_slide(market_rows)
