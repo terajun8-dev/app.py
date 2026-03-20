@@ -295,11 +295,12 @@ def fetch_today_fact(month: int, day: int) -> dict:
         article_title = picked.get("pages", [{}])[0].get("normalizedtitle", "Wikipedia")
         original_text = picked.get("text", "Today in history")
         translation = translate_text(original_text, "en", "ja", TRANSLATION_CACHE_VERSION)
-        translated_text = translation["text"] if translation["status"] == "translated" else original_text
+        translated_text = translation["text"] if translation["status"] == "translated" else ""
         translation_note = "今日は何の日を日本語訳で表示中" if translation["status"] == "translated" else "今日は何の日を表示中"
         return {
             "title": f"{picked.get('year', '--')}年の出来事",
-            "description": translated_text,
+            "description": original_text,
+            "translated_description": translated_text,
             "original_description": original_text,
             "link": picked.get("pages", [{}])[0].get("content_urls", {}).get("desktop", {}).get("page", "https://en.wikipedia.org/wiki/Main_Page"),
             "source": f"Wikimedia / {article_title}",
@@ -310,7 +311,8 @@ def fetch_today_fact(month: int, day: int) -> dict:
     except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, JSONDecodeError, KeyError, IndexError, ValueError):
         return {
             "title": "今日は何の日",
-            "description": random.choice(TODAY_FACT_FALLBACKS),
+            "description": "Today in history information is unavailable right now.",
+            "translated_description": random.choice(TODAY_FACT_FALLBACKS),
             "link": "https://en.wikipedia.org/wiki/Main_Page",
             "source": "fallback",
             "status": "demo",
@@ -382,38 +384,35 @@ def render_news_slide(title: str, news_data: dict) -> None:
     render_status_badge(news_data["status"], news_data["note"], news_data["source"], news_data["fetched_at"])
     for index, item in enumerate(news_data["items"], start=1):
         translated_title = item.get("translated_title", "")
-        translation_html = f'<div class="headline-translation">{escape(translated_title)}</div>' if translated_title else ""
-        st.markdown(
-            f"""
-            <div class="headline-card compact-headline">
-                <div class="headline-index">TOP {index}</div>
-                <div class="headline-title">
-                    <a href="{escape(item["link"])}" target="_blank" rel="noopener noreferrer">{escape(item["title"])}</a>
-                </div>
-                {translation_html}
-                <div class="headline-source">{escape(item["published_at"])} / {escape(item["source"])}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        card_html_parts = [
+            '<div class="headline-card compact-headline">',
+            f'<div class="headline-index">TOP {index}</div>',
+            '<div class="headline-title">',
+            f'<a href="{escape(item["link"])}" target="_blank" rel="noopener noreferrer">{escape(item["title"])}</a>',
+            "</div>",
+        ]
+        if translated_title:
+            card_html_parts.append(f'<div class="headline-translation">{escape(translated_title)}</div>')
+        card_html_parts.append(f'<div class="headline-source">{escape(item["published_at"])} / {escape(item["source"])}</div>')
+        card_html_parts.append("</div>")
+        st.markdown("".join(card_html_parts), unsafe_allow_html=True)
 
 
 def render_fun_slide(fun_content: dict) -> None:
     st.markdown(f'## {fun_content["heading"]}')
     render_status_badge(fun_content["status"], fun_content["note"], fun_content["source"], fun_content["fetched_at"])
-    st.markdown(
-        f"""
-        <div class="feature-panel fun-panel">
-            <div class="eyebrow">{escape(fun_content["eyebrow"])}</div>
-            <div class="fun-title">{escape(fun_content["title"])}</div>
-            <div class="fun-description">{escape(fun_content["description"])}</div>
-            <div class="market-panel-copy">
-                {escape(fun_content["footer"])}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    translated_description = fun_content.get("translated_description", "")
+    panel_html_parts = [
+        '<div class="feature-panel fun-panel">',
+        f'<div class="eyebrow">{escape(fun_content["eyebrow"])}</div>',
+        f'<div class="fun-title">{escape(fun_content["title"])}</div>',
+        f'<div class="fun-description">{escape(fun_content["description"])}</div>',
+    ]
+    if translated_description:
+        panel_html_parts.append(f'<div class="fun-translation">{escape(translated_description)}</div>')
+    panel_html_parts.append(f'<div class="market-panel-copy">{escape(fun_content["footer"])}</div>')
+    panel_html_parts.append("</div>")
+    st.markdown("".join(panel_html_parts), unsafe_allow_html=True)
 
 
 initialize_state()
@@ -589,6 +588,13 @@ st.markdown(
         font-size: 0.98rem;
         white-space: pre-wrap;
     }
+    .fun-translation {
+        margin-top: 10px;
+        color: #cbd5e1;
+        line-height: 1.7;
+        font-size: 0.9rem;
+        white-space: pre-wrap;
+    }
     .market-card {
         background: rgba(8, 14, 28, 0.95);
         border: 1px solid rgba(96, 165, 250, 0.1);
@@ -726,6 +732,7 @@ fun_content = random.choice(
             "eyebrow": "RANDOM HOROSCOPE",
             "title": fortune["title"],
             "description": fortune["description"],
+            "translated_description": "",
             "footer": f'Lucky item: {fortune["lucky"]} / Lucky color: {fortune["color"]}',
             "source": fortune["source"],
             "status": fortune["status"],
@@ -737,6 +744,7 @@ fun_content = random.choice(
             "eyebrow": "TODAY IN HISTORY",
             "title": today_fact["title"],
             "description": today_fact["description"],
+            "translated_description": today_fact.get("translated_description", ""),
             "footer": f'Open: {today_fact["link"]}',
             "source": today_fact["source"],
             "status": today_fact["status"],
