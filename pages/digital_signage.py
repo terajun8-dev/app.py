@@ -10,6 +10,8 @@ from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
 import streamlit as st
+from deep_translator import GoogleTranslator
+from deep_translator.exceptions import BaseError, RequestError, ServerException
 from streamlit_autorefresh import st_autorefresh
 from streamlit_geolocation import streamlit_geolocation
 
@@ -30,6 +32,7 @@ USER_AGENT = "Mozilla/5.0 (compatible; MyStreamlitApp/1.0)"
 DEFAULT_MANUAL_LOCATION = "Tokyo"
 JST = timezone(timedelta(hours=9))
 CACHE_VERSION = "jst-cache-v2"
+TRANSLATION_CACHE_VERSION = "free-translate-v1"
 
 SAMPLE_WEATHER = {
     "area_label": "Tokyo",
@@ -129,6 +132,22 @@ def timestamp_now() -> str:
     return datetime.now(JST).strftime("%H:%M:%S")
 
 
+@st.cache_data(ttl=21600, show_spinner=False)
+def translate_text(text: str, source_lang: str, target_lang: str, cache_version: str) -> dict:
+    normalized = " ".join(text.split())
+    if not normalized:
+        return {"text": "", "status": "empty"}
+    if source_lang == target_lang:
+        return {"text": normalized, "status": "same-language"}
+    try:
+        translated = GoogleTranslator(source=source_lang, target=target_lang).translate(normalized)
+        if not translated:
+            raise ValueError("Translator returned no text.")
+        return {"text": translated.strip(), "status": "translated"}
+    except (BaseError, RequestError, ServerException, ValueError):
+        return {"text": "", "status": "failed"}
+
+
 def format_pub_date(pub_date_text: str) -> str:
     if not pub_date_text:
         return "--:--"
@@ -220,7 +239,7 @@ def resolve_weather() -> tuple[dict, str]:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, limit: int) -> dict:
+def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, limit: int, translate_to_ja: bool = False) -> dict:
     try:
         xml_text = cached_fetch_rss_text(url, CACHE_VERSION)
         root = ET.fromstring(xml_text)
@@ -230,9 +249,16 @@ def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, lim
             source = item.findtext("source", default=source_label)
             link = item.findtext("link", default=url)
             pub_date = item.findtext("pubDate", default="")
+            title_text = title.strip()
+            translated_title = ""
+            if translate_to_ja:
+                translation = translate_text(title_text, "auto", "ja", TRANSLATION_CACHE_VERSION)
+                if translation["status"] == "translated" and translation["text"] != title_text:
+                    translated_title = translation["text"]
             parsed_items.append(
                 {
-                    "title": title.strip(),
+                    "title": title_text,
+                    "translated_title": translated_title,
                     "source": source.strip(),
                     "link": link.strip(),
                     "published_at": format_pub_date(pub_date.strip()),
@@ -267,13 +293,18 @@ def fetch_today_fact(month: int, day: int) -> dict:
             raise ValueError("No on-this-day events returned.")
         picked = random.choice(events[: min(len(events), 20)])
         article_title = picked.get("pages", [{}])[0].get("normalizedtitle", "Wikipedia")
+        original_text = picked.get("text", "Today in history")
+        translation = translate_text(original_text, "en", "ja", TRANSLATION_CACHE_VERSION)
+        translated_text = translation["text"] if translation["status"] == "translated" else original_text
+        translation_note = "今日は何の日を日本語訳で表示中" if translation["status"] == "translated" else "今日は何の日を表示中"
         return {
             "title": f"{picked.get('year', '--')}年の出来事",
-            "description": picked.get("text", "Today in history"),
+            "description": translated_text,
+            "original_description": original_text,
             "link": picked.get("pages", [{}])[0].get("content_urls", {}).get("desktop", {}).get("page", "https://en.wikipedia.org/wiki/Main_Page"),
             "source": f"Wikimedia / {article_title}",
             "status": "live",
-            "note": "今日は何の日を表示中",
+            "note": translation_note,
             "fetched_at": timestamp_now(),
         }
     except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, JSONDecodeError, KeyError, IndexError, ValueError):
@@ -350,6 +381,8 @@ def render_news_slide(title: str, news_data: dict) -> None:
     st.markdown(f"## {title}")
     render_status_badge(news_data["status"], news_data["note"], news_data["source"], news_data["fetched_at"])
     for index, item in enumerate(news_data["items"], start=1):
+        translated_title = item.get("translated_title", "")
+        translation_html = f'<div class="headline-translation">{escape(translated_title)}</div>' if translated_title else ""
         st.markdown(
             f"""
             <div class="headline-card compact-headline">
@@ -357,6 +390,7 @@ def render_news_slide(title: str, news_data: dict) -> None:
                 <div class="headline-title">
                     <a href="{escape(item["link"])}" target="_blank" rel="noopener noreferrer">{escape(item["title"])}</a>
                 </div>
+                {translation_html}
                 <div class="headline-source">{escape(item["published_at"])} / {escape(item["source"])}</div>
             </div>
             """,
@@ -525,6 +559,12 @@ st.markdown(
         font-size: 0.78rem;
         letter-spacing: 0.04em;
     }
+    .headline-translation {
+        margin-top: 6px;
+        color: #cbd5e1;
+        font-size: 0.78rem;
+        line-height: 1.5;
+    }
     .market-panel {
         margin-top: 14px;
         padding: 14px 16px;
@@ -675,6 +715,7 @@ global_news = fetch_rss_items(
     fallback_items=SAMPLE_GLOBAL_NEWS,
     source_label="Google News World",
     limit=3,
+    translate_to_ja=True,
 )
 today_fact = fetch_today_fact(datetime.now(JST).month, datetime.now(JST).day)
 fortune = build_fortune()

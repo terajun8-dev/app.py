@@ -1,6 +1,7 @@
 streamlit
 streamlit-autorefresh
 streamlit-geolocation
+deep-translator
 numpy
 numpy-financial
 pandas
