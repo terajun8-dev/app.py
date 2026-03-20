@@ -42,19 +42,15 @@ SAMPLE_WEATHER = {
 }
 
 SAMPLE_DOMESTIC_NEWS = [
-    {"title": "政府、来年度の成長戦略を発表", "source": "Demo News JP"},
-    {"title": "主要都市で春のイベント準備が本格化", "source": "Demo News JP"},
-    {"title": "国内製造業の景況感が緩やかに改善", "source": "Demo News JP"},
-    {"title": "鉄道各社、混雑緩和へ新たな実証実験", "source": "Demo News JP"},
-    {"title": "地方観光の回復基調が続く", "source": "Demo News JP"},
+    {"title": "政府、来年度の成長戦略を発表", "source": "Demo News JP", "link": "https://www3.nhk.or.jp/news/"},
+    {"title": "主要都市で春のイベント準備が本格化", "source": "Demo News JP", "link": "https://www3.nhk.or.jp/news/"},
+    {"title": "国内製造業の景況感が緩やかに改善", "source": "Demo News JP", "link": "https://www3.nhk.or.jp/news/"},
 ]
 
 SAMPLE_GLOBAL_NEWS = [
-    {"title": "Global markets await central bank signals", "source": "Demo World News"},
-    {"title": "Major cities expand clean-energy projects", "source": "Demo World News"},
-    {"title": "Shipping routes recover after weather delays", "source": "Demo World News"},
-    {"title": "AI investment remains a top boardroom priority", "source": "Demo World News"},
-    {"title": "Travel demand rises across key regions", "source": "Demo World News"},
+    {"title": "Global markets await central bank signals", "source": "Demo World News", "link": "https://www.bbc.com/news/world"},
+    {"title": "Major cities expand clean-energy projects", "source": "Demo World News", "link": "https://www.bbc.com/news/world"},
+    {"title": "Shipping routes recover after weather delays", "source": "Demo World News", "link": "https://www.bbc.com/news/world"},
 ]
 
 SAMPLE_MARKETS = [
@@ -70,7 +66,6 @@ def initialize_state() -> None:
         "signage_playlist": DEFAULT_PLAYLIST.copy(),
         "signage_autoplay": True,
         "signage_interval": 8,
-        "signage_news_items": 5,
         "signage_location_mode": "現在地を優先",
         "signage_manual_location": DEFAULT_MANUAL_LOCATION,
         "signage_last_refresh_count": None,
@@ -110,6 +105,17 @@ def cached_fetch_text(url: str) -> str:
 
 def timestamp_now() -> str:
     return datetime.now().strftime("%H:%M:%S")
+
+
+def weather_text_art(description: str) -> str:
+    lowered = description.lower()
+    if "rain" in lowered or "雨" in description:
+        return "  .-.   \n (   ). \n(___(__)\n ' ' ' '\n' ' ' '"
+    if "cloud" in lowered or "くもり" in description:
+        return "   .--. \n.-(    ).\n(___.__)__\n         "
+    if "snow" in lowered or "雪" in description:
+        return "  .-.   \n (   ). \n(___(__)\n * * * *\n* * * * "
+    return " \\   /  \n  .-.   \n-(   )- \n  `-'   \n /   \\  "
 
 
 def build_area_label(payload: dict, fallback: str) -> str:
@@ -199,7 +205,8 @@ def fetch_rss_items(url: str, fallback_items: list[dict], source_label: str, lim
         for item in root.findall(".//item")[:limit]:
             title = item.findtext("title", default="(no title)")
             source = item.findtext("source", default=source_label)
-            parsed_items.append({"title": title.strip(), "source": source.strip()})
+            link = item.findtext("link", default=url)
+            parsed_items.append({"title": title.strip(), "source": source.strip(), "link": link.strip()})
         if not parsed_items:
             raise ValueError("RSS feed returned no items.")
         return {
@@ -235,9 +242,9 @@ def fetch_market_quote(symbol: str, name: str) -> dict:
             "close": close_value,
             "change": change_value,
             "change_pct": change_pct,
-            "source": "stooq",
-            "status": "live",
-            "note": "ライブ指数を表示中",
+            "source": "stooq daily snapshot",
+            "status": "snapshot",
+            "note": "直近取得できた定時指標を表示中",
             "fetched_at": timestamp_now(),
         }
     except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, KeyError, StopIteration, ValueError, ZeroDivisionError):
@@ -245,17 +252,24 @@ def fetch_market_quote(symbol: str, name: str) -> dict:
             if fallback["symbol"] == symbol:
                 return {
                     **fallback,
-                    "source": "sample",
-                    "status": "demo",
-                    "note": "ライブ指数を取得できなかったため、サンプル表示です。",
+                    "source": "reference snapshot",
+                    "status": "snapshot",
+                    "note": "基準スナップショットを表示中",
                     "fetched_at": timestamp_now(),
                 }
         raise
 
 
 def render_status_badge(status: str, note: str, source: str, fetched_at: str) -> None:
-    badge_color = "#14b8a6" if status == "live" else "#f59e0b"
-    badge_label = "LIVE" if status == "live" else "DEMO"
+    if status == "live":
+        badge_color = "#14b8a6"
+        badge_label = "LIVE"
+    elif status == "snapshot":
+        badge_color = "#60a5fa"
+        badge_label = "SNAPSHOT"
+    else:
+        badge_color = "#f59e0b"
+        badge_label = "DEMO"
     st.markdown(
         f"""
         <div class="status-row">
@@ -270,24 +284,27 @@ def render_status_badge(status: str, note: str, source: str, fetched_at: str) ->
 
 
 def render_weather_slide(weather: dict, location_status: str) -> None:
-    left, right = st.columns([1.45, 1])
-    with left:
-        st.markdown("## 今日の天気")
-        st.markdown(
-            f"""
-            <div class="feature-panel weather-panel">
-                <div class="eyebrow">LOCAL WEATHER</div>
-                <div class="feature-location">{escape(weather["area_label"])}</div>
-                <div class="feature-value">{escape(weather["temp_c"])}°C</div>
-                <div class="feature-subtitle">{escape(weather["description"])}</div>
+    art = weather_text_art(weather["description"])
+    st.markdown("## 今日の天気")
+    st.markdown(
+        f"""
+        <div class="feature-panel weather-panel compact-weather">
+            <div class="weather-grid">
+                <pre class="weather-art">{escape(art)}</pre>
+                <div class="weather-copy">
+                    <div class="eyebrow">LOCAL WEATHER</div>
+                    <div class="feature-location">{escape(weather["area_label"])}</div>
+                    <div class="weather-inline">
+                        <span class="feature-value">{escape(weather["temp_c"])}°C</span>
+                        <span class="feature-subtitle">{escape(weather["description"])}</span>
+                    </div>
+                    <div class="weather-meta">体感 {escape(weather["feels_like_c"])}°C / 湿度 {escape(weather["humidity"])}% / {escape(location_status)}</div>
+                </div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with right:
-        st.metric("体感温度", f'{weather["feels_like_c"]}°C')
-        st.metric("湿度", f'{weather["humidity"]}%')
-        st.info(f"天気ソース: {location_status}")
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     render_status_badge(weather["status"], weather["note"], weather["source"], weather["fetched_at"])
 
 
@@ -297,9 +314,11 @@ def render_news_slide(title: str, news_data: dict) -> None:
     for index, item in enumerate(news_data["items"], start=1):
         st.markdown(
             f"""
-            <div class="headline-card">
-                <div class="headline-index">HEADLINE {index:02d}</div>
-                <div class="headline-title">{escape(item["title"])}</div>
+            <div class="headline-card compact-headline">
+                <div class="headline-index">TOP {index}</div>
+                <div class="headline-title">
+                    <a href="{escape(item["link"])}" target="_blank" rel="noopener noreferrer">{escape(item["title"])}</a>
+                </div>
                 <div class="headline-source">{escape(item["source"])}</div>
             </div>
             """,
@@ -308,31 +327,34 @@ def render_news_slide(title: str, news_data: dict) -> None:
 
 
 def render_market_slide(market_rows: list[dict]) -> None:
-    st.markdown("## 株価・主要指数")
-    market_status = "demo" if any(row["status"] == "demo" for row in market_rows) else "live"
+    st.markdown("## 株式指標")
+    market_status = "snapshot"
     market_note = " / ".join(sorted({row["note"] for row in market_rows}))
     market_source = ", ".join(sorted({row["source"] for row in market_rows}))
     market_updated = ", ".join(sorted({row["fetched_at"] for row in market_rows}))
     render_status_badge(market_status, market_note, market_source, market_updated)
     columns = st.columns(len(market_rows))
     for column, row in zip(columns, market_rows):
-        delta_color = "normal" if row["change"] >= 0 else "inverse"
-        column.metric(
-            label=f'{row["name"]} ({row["symbol"]})',
-            value=f'{row["close"]:,.2f}',
-            delta=f'{row["change"]:+.2f} / {row["change_pct"]:+.2f}%',
-            delta_color=delta_color,
+        delta_class = "up" if row["change"] >= 0 else "down"
+        column.markdown(
+            f"""
+            <div class="market-card">
+                <div class="eyebrow">{escape(row["symbol"])}</div>
+                <div class="market-name">{escape(row["name"])}</div>
+                <div class="market-close">{row["close"]:,.2f}</div>
+                <div class="market-delta {delta_class}">{row["change"]:+.2f} / {row["change_pct"]:+.2f}%</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
     st.markdown(
         """
         <div class="feature-panel market-panel">
             <div class="market-panel-copy">
-                主要指数を見やすく表示しています。`stooq` で十分な更新頻度が得られない場合は、運用では
-                <strong>Twelve Data</strong>、<strong>Alpha Vantage</strong>、<strong>Finnhub</strong>、
-                または証券会社/取引所提供APIへの切替が現実的です。
+                Nikkei 225 / S&amp;P 500 / Dow Jones を定時スナップショットとして表示します。
             </div>
             <div class="market-panel-copy subtle">
-                サイネージ用途では、厳密なティック配信よりも「5〜15分遅延の安定取得 + 明確な更新時刻表示」の方が運用しやすいです。
+                より厳密な更新が必要なら Twelve Data / Alpha Vantage / Finnhub / 証券会社API への切替が候補です。
             </div>
         </div>
         """,
@@ -424,25 +446,51 @@ st.markdown(
         box-shadow: 0 14px 30px rgba(0,0,0,0.2);
     }
     .weather-panel {
-        min-height: 310px;
-        padding: 24px;
+        min-height: 220px;
+        padding: 18px 20px;
         background: linear-gradient(135deg, rgba(55, 48, 163, 0.76), rgba(8, 14, 28, 0.98));
     }
-    .feature-location {
+    .compact-weather .weather-grid {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 20px;
+        align-items: center;
+    }
+    .weather-art {
+        margin: 0;
         font-size: 1rem;
+        line-height: 1.1;
+        color: #e0e7ff;
+        background: rgba(15, 23, 42, 0.28);
+        border-radius: 12px;
+        padding: 12px;
+    }
+    .feature-location {
+        font-size: 0.95rem;
         color: #c4b5fd;
-        margin-top: 0.6rem;
+        margin-top: 0.35rem;
     }
     .feature-value {
-        font-size: 3.9rem;
+        font-size: 2.55rem;
         font-weight: 800;
         line-height: 1.08;
-        margin-top: 0.5rem;
+        margin-top: 0;
     }
     .feature-subtitle {
-        font-size: 0.98rem;
+        font-size: 0.92rem;
         color: #d8e3ff;
-        margin-top: 0.6rem;
+        margin-top: 0;
+    }
+    .weather-inline {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin-top: 0.5rem;
+    }
+    .weather-meta {
+        margin-top: 0.55rem;
+        font-size: 0.82rem;
+        color: #cbd5e1;
     }
     .status-row {
         display: flex;
@@ -465,27 +513,64 @@ st.markdown(
         font-weight: 600;
     }
     .headline-card {
-        padding: 16px 18px;
-        margin-bottom: 12px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
     }
     .headline-title {
-        font-size: 1.06rem;
+        font-size: 0.96rem;
         font-weight: 700;
-        margin-top: 8px;
-        line-height: 1.45;
+        margin-top: 4px;
+        line-height: 1.35;
+    }
+    .headline-title a {
+        color: #e5f0ff;
+        text-decoration: none;
+    }
+    .headline-title a:hover {
+        text-decoration: underline;
     }
     .headline-source {
-        margin-top: 10px;
-        font-size: 0.88rem;
+        margin-top: 6px;
+        font-size: 0.78rem;
     }
     .market-panel {
-        margin-top: 18px;
-        padding: 18px 20px;
+        margin-top: 14px;
+        padding: 14px 16px;
         color: #d1d9e6;
     }
+    .market-card {
+        background: rgba(8, 14, 28, 0.95);
+        border: 1px solid rgba(96, 165, 250, 0.1);
+        border-radius: 16px;
+        padding: 14px 16px;
+        min-height: 132px;
+    }
+    .market-name {
+        margin-top: 4px;
+        color: #dbeafe;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+    .market-close {
+        margin-top: 12px;
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #f8fafc;
+    }
+    .market-delta {
+        margin-top: 10px;
+        font-size: 0.92rem;
+        font-weight: 700;
+    }
+    .market-delta.up {
+        color: #34d399;
+    }
+    .market-delta.down {
+        color: #f87171;
+    }
     .market-panel-copy {
-        font-size: 0.9rem;
-        line-height: 1.7;
+        font-size: 0.84rem;
+        line-height: 1.65;
     }
     .market-panel-copy.subtle {
         margin-top: 0.7rem;
@@ -511,8 +596,16 @@ st.markdown(
             flex-direction: column;
             align-items: flex-start;
         }
+        .compact-weather .weather-grid {
+            grid-template-columns: 1fr;
+        }
+        .weather-inline {
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-start;
+        }
         .feature-value {
-            font-size: 3.1rem;
+            font-size: 2.2rem;
         }
     }
     </style>
@@ -524,7 +617,6 @@ with st.sidebar:
     st.header("⚙️ 表示設定")
     st.toggle("自動切替", key="signage_autoplay")
     st.slider("切替秒数", min_value=5, max_value=30, key="signage_interval")
-    st.slider("ニュース件数", min_value=3, max_value=8, key="signage_news_items")
     st.multiselect(
         "再生する画面",
         options=DEFAULT_PLAYLIST,
@@ -569,18 +661,17 @@ progress_ratio = (current_position + 1) / len(playlist)
 next_slide_label = SLIDE_LABELS[playlist[(current_position + 1) % len(playlist)]]
 
 weather, location_status = resolve_weather()
-news_limit = st.session_state["signage_news_items"]
 domestic_news = fetch_rss_items(
     url="https://www3.nhk.or.jp/rss/news/cat0.xml",
     fallback_items=SAMPLE_DOMESTIC_NEWS,
     source_label="NHK RSS",
-    limit=news_limit,
+    limit=3,
 )
 global_news = fetch_rss_items(
     url="https://feeds.bbci.co.uk/news/world/rss.xml",
     fallback_items=SAMPLE_GLOBAL_NEWS,
     source_label="BBC World RSS",
-    limit=news_limit,
+    limit=3,
 )
 market_rows = [
     fetch_market_quote("^N225", "Nikkei 225"),
