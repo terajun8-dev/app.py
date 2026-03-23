@@ -11,7 +11,7 @@ use_24h = st.selectbox("Time format", ["24-hour (Recommended)", "12-hour"], inde
 is24 = "true" if use_24h.startswith("24") else "false"
 showSeconds = "true" if show_seconds else "false"
 
-html = f"""
+html = """
 <!doctype html>
 <html>
 <head>
@@ -63,9 +63,9 @@ html = f"""
       const m = pad(d.getMinutes());
       const s = pad(d.getSeconds());
       const sep = '<span class="colon">:</span>';
-      const time = `${'{'}h{'}'}${sep}${m}` + (showSeconds ? `${sep}${s}` : '');
+      const time = `${{h}}${{sep}}${{m}}` + (showSeconds ? `${{sep}}${{s}}` : '');
       document.getElementById('clock').innerHTML = time;
-      document.getElementById('date').textContent = d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+      document.getElementById('date').textContent = d.toLocaleDateString(undefined, {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }});
     }
 
     // keep high-frequency updates for smooth seconds
@@ -75,6 +75,9 @@ html = f"""
 </body>
 </html>
 """
+
+html = html.replace("{{", "{").replace("}}", "}")
+html = html.replace("{is24}", is24).replace("{showSeconds}", showSeconds)
 
 components.html(html, height=360, scrolling=False)
 
