@@ -70,7 +70,13 @@ st.markdown(html, unsafe_allow_html=True)
 
 st.caption("Art Watch — retro-inspired digital clock. Use the Display variation selector to change style.")
 
-# auto refresh by rerunning the script
+# auto refresh with safe fallback
 if auto:
-    time.sleep(1)
-    st.experimental_rerun()
+    try:
+        time.sleep(1)
+        # attempt to rerun; some Streamlit deployments may not expose experimental_rerun
+        st.experimental_rerun()
+    except Exception:
+        st.warning("Auto-refresh is not supported in this environment; please refresh the page manually or uncheck 'Auto refresh'.")
+        # short sleep to avoid tight loop
+        time.sleep(1)
