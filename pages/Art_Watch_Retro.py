@@ -69,15 +69,27 @@ html = """
       return lines.join('\n');
     }
 
+    function adjust(){
+      const panel = document.getElementById('panel');
+      if(!panel) return;
+      const w = panel.clientWidth || panel.offsetWidth || window.innerWidth;
+      const newH = Math.max(120, Math.floor(w/2));
+      panel.style.height = newH + 'px';
+      const fs = Math.max(10, Math.floor(w/16));
+      const el = document.getElementById('clock');
+      if(el) el.style.fontSize = fs + 'px';
+    }
+
     function update(){
       try{
+        adjust();
         const d = new Date();
         const h = pad(d.getHours());
         const m = pad(d.getMinutes());
         const s = pad(d.getSeconds());
         const ascii = renderAscii(h,m,s);
         const el = document.getElementById('clock');
-        el.textContent = ascii;
+        if(el) el.textContent = ascii;
         const panel = document.getElementById('panel');
         panel.classList.remove('neon','crt','mono');
         const cls = variation.toLowerCase().includes('crt') ? 'crt' : (variation.toLowerCase().includes('mono') ? 'mono' : 'neon');
@@ -85,8 +97,10 @@ html = """
       }catch(e){ console.error('update error', e); }
     }
 
-    update();
-    setInterval(update, 500);
+    window.addEventListener('resize', function(){ setTimeout(adjust,50); });
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ update(); setInterval(update,500); },50); });
+    // fallback
+    setTimeout(function(){ update(); setInterval(update,500); },200);
   </script>
 </body>
 </html>
