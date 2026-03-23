@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Art Watch", layout="centered")
 
-st.title("Art Watch")
+st.markdown("<div style='font-size:14px; text-align:center; margin-bottom:6px; font-weight:600;'>Art Watch</div>", unsafe_allow_html=True)
 
 variation = st.selectbox("Display variation", ["Neon (Recommended)", "CRT", "Monochrome"], index=0)
 # always show seconds and default to 24-hour
@@ -25,9 +25,9 @@ html = """
     }
     html,body{height:100%;margin:0;padding:0;background:linear-gradient(180deg,#000 0%, #060006 100%);font-family: 'Courier New', monospace;}
     .container{min-height:72vh;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px}
-    .panel{width:100%;max-width:1400px;}
+    .panel{width:100%;max-width:1400px;background:rgba(12,12,12,0.65);padding:18px;border-radius:12px;}
     .panel-wrapper{position:relative;border-radius:12px;padding:8px}
-    pre.clock-pre{font-family: 'Courier New', monospace;font-size:20px;line-height:0.78;white-space:pre;letter-spacing:2px;margin:0}
+    pre.clock-pre{font-family: 'Courier New', monospace;font-size:28px;line-height:0.78;white-space:pre;letter-spacing:2px;margin:0;color:#FFFFFF;background:transparent;padding:8px}
 
     /* variations */
     .neon pre.clock-pre{color:var(--neon-cyan);text-shadow:0 0 18px var(--neon-cyan), 0 0 36px var(--neon-magenta);}
@@ -197,6 +197,6 @@ html = """
 
 html = html.replace("{variation}", f'"{variation}"').replace("{is24}", is24).replace("{showSeconds}", showSeconds)
 
-components.html(html, height=800, scrolling=True)
+components.html(html, height=920, scrolling=True)
 
 st.caption("Art Watch — retro-inspired digital clock. Use the Display variation selector to change style.")
