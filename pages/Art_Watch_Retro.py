@@ -1,15 +1,14 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Art Watch — Retro", layout="centered")
+st.set_page_config(page_title="Art Watch", layout="centered")
 
-st.title("Art Watch — Retro Style Digital Clock")
+st.title("Art Watch")
 
-show_seconds = st.checkbox("Show seconds", value=True)
-use_24h = st.selectbox("Time format", ["24-hour (Recommended)", "12-hour"], index=0)
-
-is24 = "true" if use_24h.startswith("24") else "false"
-showSeconds = "true" if show_seconds else "false"
+variation = st.selectbox("Display variation", ["Neon (Recommended)", "CRT", "Monochrome"], index=0)
+# always show seconds and default to 24-hour
+is24 = "true"
+showSeconds = "true"
 
 html = """
 <!doctype html>
@@ -54,6 +53,7 @@ html = """
   <script>
     const is24 = {is24};
     const showSeconds = {showSeconds};
+    const variation = {variation};
 
     function pad(n){return n<10?('0'+n):n}
     function update(){
@@ -77,8 +77,8 @@ html = """
 """
 
 html = html.replace("{{", "{").replace("}}", "}")
-html = html.replace("{is24}", is24).replace("{showSeconds}", showSeconds)
+html = html.replace("{is24}", is24).replace("{showSeconds}", showSeconds).replace("{variation}", f'"{variation}"')
 
 components.html(html, height=360, scrolling=False)
 
-st.caption("Retro digital clock inspired by old-school LED/CRT aesthetics. Use controls above to toggle seconds and time format.")
+st.caption("Art Watch — retro-inspired digital clock. Use the Display variation selector to change style.")
