@@ -23,11 +23,11 @@ html = """
       --neon-magenta:#FF00FF;
       --crt-green:#66FF66;
     }
-    html,body{height:100%;margin:0;padding:0;background:linear-gradient(180deg,#000 0%, #060006 100%);font-family: 'Courier New', monospace;}
+    html,body{height:100%;margin:0;padding:0;background:var(--bg);font-family: 'Courier New', monospace;}
     .container{min-height:72vh;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px}
-    .panel{width:100%;max-width:1400px;background:rgba(12,12,12,0.65);padding:18px;border-radius:12px;}
+    .panel{width:100vw;max-width:none;margin-left:calc(-50vw + 50%);height:calc(50vw);background:var(--bg);display:flex;align-items:center;justify-content:center;padding:0;border-radius:0;}
     .panel-wrapper{position:relative;border-radius:12px;padding:8px}
-    pre.clock-pre{font-family: 'Courier New', monospace;font-size:28px;line-height:0.78;white-space:pre;letter-spacing:2px;margin:0;color:#FFFFFF;background:transparent;padding:8px}
+    pre.clock-pre{font-family: 'Courier New', monospace;font-size:28px;line-height:0.78;white-space:pre;letter-spacing:2px;margin:0;color:#FFFFFF;background:transparent;padding:8px;text-align:center;display:block;}
 
     /* variations */
     .neon pre.clock-pre{color:var(--neon-cyan);text-shadow:0 0 18px var(--neon-cyan), 0 0 36px var(--neon-magenta);}
@@ -158,6 +158,15 @@ html = """
         ' ░ ',
         '   ',
         '   '
+      ],
+      ' ': [
+        '       ',
+        '       ',
+        '       ',
+        '       ',
+        '       ',
+        '       ',
+        '       '
       ]
     };
 
@@ -197,6 +206,6 @@ html = """
 
 html = html.replace("{variation}", f'"{variation}"').replace("{is24}", is24).replace("{showSeconds}", showSeconds)
 
-components.html(html, height=920, scrolling=True)
+components.html(html, height=1000, scrolling=True)
 
 st.caption("Art Watch — retro-inspired digital clock. Use the Display variation selector to change style.")
