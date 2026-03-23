@@ -16,69 +16,187 @@ html = """
 <head>
   <meta charset='utf-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1'>
-  <link href='https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap' rel='stylesheet'>
   <style>
-    :root{{
+    :root{
       --bg:#000000;
       --neon-cyan:#00FFFF;
       --neon-magenta:#FF00FF;
-      --glass: rgba(255,255,255,0.03);
-    }}
-    html,body{{height:100%;margin:0;padding:0;background:linear-gradient(180deg,#000 0%, #060006 100%);font-family: 'Press Start 2P', monospace;}}
-    .wrap{{height:280px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}}
-    .panel{{padding:24px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.2));box-shadow: 0 0 40px rgba(255,0,255,0.05) inset, 0 0 30px rgba(0,255,255,0.03);border:2px solid rgba(255,255,255,0.03);}}
-    .clock{{font-size:46px;color:var(--neon-cyan);text-align:center;padding:10px 20px;border-radius:8px;position:relative;}}
-    .clock::after{{content:'';position:absolute;inset:0;border-radius:8px;box-shadow:0 0 32px var(--neon-magenta);mix-blend-mode:screen;opacity:0.12;pointer-events:none}}
-    .date{{font-size:11px;color:var(--neon-magenta);text-align:center;margin-top:6px;opacity:0.9}}
+      --crt-green:#66FF66;
+    }
+    html,body{height:100%;margin:0;padding:0;background:linear-gradient(180deg,#000 0%, #060006 100%);font-family: 'Courier New', monospace;}
+    .container{min-height:72vh;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:8px}
+    .panel{width:100%;max-width:1400px;}
+    .panel-wrapper{position:relative;border-radius:12px;padding:8px}
+    pre.clock-pre{font-family: 'Courier New', monospace;font-size:20px;line-height:0.78;white-space:pre;letter-spacing:2px;margin:0}
 
-    /* scanlines */
-    .scanline:before{{content:'';position:absolute;left:0;right:0;top:0;bottom:0;background-image:linear-gradient(rgba(0,0,0,0.02) 50%, rgba(255,255,255,0.01) 51%);background-size:100% 4px;mix-blend-mode:overlay;opacity:0.6;border-radius:12px;}}
+    /* variations */
+    .neon pre.clock-pre{color:var(--neon-cyan);text-shadow:0 0 18px var(--neon-cyan), 0 0 36px var(--neon-magenta);}
+    .crt pre.clock-pre{color:var(--crt-green);text-shadow:0 0 6px rgba(102,255,102,0.6);filter:contrast(1.15) brightness(1.05);}
+    .mono pre.clock-pre{color:#FFFFFF;text-shadow:none;}
 
-    /* blinking colon */
-    .colon{{animation:blink 1s steps(1) infinite;}}
-    @keyframes blink{{50%{{opacity:0}}}}
+    /* CRT scanlines overlay */
+    .crt .panel-overlay{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(0,0,0,0.08) 50%, rgba(255,255,255,0.02) 51%);background-size:100% 4px;border-radius:12px;opacity:0.6}
 
-    /* small screen scaling */
-    @media (max-width:420px){{ .clock{{font-size:28px}} }}
+    /* responsive sizing */
+    @media (min-width:900px){ pre.clock-pre{font-size:28px} }
+    @media (min-width:1200px){ pre.clock-pre{font-size:36px} }
+    @media (min-width:1600px){ pre.clock-pre{font-size:44px} }
+
+    .note{font-size:12px;color:rgba(255,255,255,0.75);text-align:center;margin-top:14px}
+
   </style>
 </head>
 <body>
-  <div class='wrap'>
-    <div class='panel scanline'>
-      <div id='clock' class='clock'>--:--</div>
-      <div id='date' class='date'></div>
+  <div class='container'>
+    <div class='panel-wrapper'>
+      <div id='panel' class='panel'>
+        <div class='panel-overlay' style='display:none'></div>
+        <pre id='clock' class='clock-pre'>LOADING...</pre>
+      </div>
     </div>
   </div>
 
   <script>
-    const is24 = {is24};
-    const showSeconds = {showSeconds};
     const variation = {variation};
 
+    const DIGITS = {
+      '0': [
+        ' █████ ',
+        '██   ██',
+        '██  ███',
+        '██ █ ██',
+        '███  ██',
+        '██   ██',
+        ' █████ '
+      ],
+      '1': [
+        '  ██   ',
+        ' ███   ',
+        '  ██   ',
+        '  ██   ',
+        '  ██   ',
+        '  ██   ',
+        ' █████ '
+      ],
+      '2': [
+        ' █████ ',
+        '██   ██',
+        '    ██ ',
+        '  ███  ',
+        ' ██    ',
+        '██     ',
+        '███████'
+      ],
+      '3': [
+        ' █████ ',
+        '██   ██',
+        '    ██ ',
+        '  ███  ',
+        '    ██ ',
+        '██   ██',
+        ' █████ '
+      ],
+      '4': [
+        '   ███ ',
+        '  █ ██ ',
+        ' █  ██ ',
+        '█   ██ ',
+        '███████',
+        '    ██ ',
+        '    ██ '
+      ],
+      '5': [
+        '███████',
+        '██     ',
+        '█████  ',
+        '     ██',
+        '     ██',
+        '██   ██',
+        ' █████ '
+      ],
+      '6': [
+        ' █████ ',
+        '██   ██',
+        '██     ',
+        '██████ ',
+        '██   ██',
+        '██   ██',
+        ' █████ '
+      ],
+      '7': [
+        '███████',
+        '     ██',
+        '    ██ ',
+        '   ██  ',
+        '  ██   ',
+        '  ██   ',
+        '  ██   '
+      ],
+      '8': [
+        ' █████ ',
+        '██   ██',
+        '██   ██',
+        ' █████ ',
+        '██   ██',
+        '██   ██',
+        ' █████ '
+      ],
+      '9': [
+        ' █████ ',
+        '██   ██',
+        '██   ██',
+        ' ██████',
+        '     ██',
+        '██   ██',
+        ' █████ '
+      ],
+      ':': [
+        '   ',
+        ' ░ ',
+        '   ',
+        '   ',
+        ' ░ ',
+        '   ',
+        '   '
+      ]
+    };
+
     function pad(n){return n<10?('0'+n):n}
-    function update(){
-      const d = new Date();
-      let h = d.getHours();
-      if(!is24) h = h % 12 || 12;
-      const m = pad(d.getMinutes());
-      const s = pad(d.getSeconds());
-      const sep = '<span class="colon">:</span>';
-      const time = `${{h}}${{sep}}${{m}}` + (showSeconds ? `${{sep}}${{s}}` : '');
-      document.getElementById('clock').innerHTML = time;
-      document.getElementById('date').textContent = d.toLocaleDateString(undefined, {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }});
+
+    function renderAscii(h,m,s){
+      const str = `${h}:${m}:${s}`;
+      const lines = Array(7).fill('');
+      for(let ch of str){
+        const pattern = DIGITS[ch] || DIGITS[' '];
+        for(let i=0;i<7;i++) lines[i] += pattern[i] + '  ';
+      }
+      return lines.join('\n');
     }
 
-    // keep high-frequency updates for smooth seconds
+    function update(){
+      const d = new Date();
+      const h = pad(d.getHours());
+      const m = pad(d.getMinutes());
+      const s = pad(d.getSeconds());
+      document.getElementById('clock').textContent = renderAscii(h,m,s);
+    }
+
+    // apply variation
+    const panel = document.getElementById('panel');
+    const overlay = panel.querySelector('.panel-overlay');
+    const cls = variation.toLowerCase().includes('crt') ? 'crt' : (variation.toLowerCase().includes('mono') ? 'mono' : 'neon');
+    panel.classList.add(cls);
+    if(cls==='crt') overlay.style.display='block';
+
     update();
-    setInterval(update, 250);
+    setInterval(update,250);
   </script>
 </body>
 </html>
 """
 
-html = html.replace("{{", "{").replace("}}", "}")
-html = html.replace("{is24}", is24).replace("{showSeconds}", showSeconds).replace("{variation}", f'"{variation}"')
+html = html.replace("{variation}", f'"{variation}"').replace("{is24}", is24).replace("{showSeconds}", showSeconds)
 
-components.html(html, height=360, scrolling=False)
+components.html(html, height=800, scrolling=True)
 
 st.caption("Art Watch — retro-inspired digital clock. Use the Display variation selector to change style.")
