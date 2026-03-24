@@ -89,22 +89,13 @@ def to_text_art(s: str, mode: str, font: str = None) -> str:
 
 art = to_text_art(text, method, selected_font)
 
-# display using HTML <pre> so font-size can be adjusted
-html = f"""
-<div style='width:100%;display:flex;justify-content:center;'>
-  <div style='width:98%; background:#000; padding:12px;'>
-    <pre id='preview' style='background:#000; color:#fff; font-family:monospace; margin:0; font-size:{display_size}px; line-height:0.85;'>{art}</pre>
-  </div>
-</div>
-"""
-
-# st.markdown with unsafe HTML
-st.markdown(html, unsafe_allow_html=True)
-
-# Debug section
-with st.expander('Debug output (show generated raw text)'):
-    st.text_area('Raw text output', value=art, height=280)
-    st.write('repr:', repr(art))
+# Display using Streamlit's native code/text components (reliable rendering)
+st.markdown("<div style='width:100%;display:flex;justify-content:center;'><div style='width:98%; padding:6px;'>", unsafe_allow_html=True)
+# show in st.code for monospace and preserved formatting; font-size is limited by Streamlit, but raw text will be correct
+st.code(art)
+# Also show editable raw text for copy/paste
+st.text_area('Raw text output (editable)', value=art, height=320)
+st.markdown("</div></div>", unsafe_allow_html=True)
 
 st.caption("Converted using selected method. pyfiglet support is used when available; otherwise a simple block fallback is shown.")
 
