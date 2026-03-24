@@ -105,4 +105,5 @@ st.caption("Converted using selected method. pyfiglet support is used when avail
 
 # manual refresh
 if st.button('Refresh'):
-    st.experimental_rerun()
+    # Button causes Streamlit to rerun; explicit experimental_rerun is not called to avoid environment errors
+    pass
