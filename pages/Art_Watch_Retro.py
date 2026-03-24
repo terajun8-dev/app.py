@@ -7,7 +7,9 @@ st.set_page_config(page_title="Art Watch", layout="wide")
 st.markdown("<div style='font-size:12px; text-align:center; margin-bottom:6px; font-weight:600;'>Art Watch</div>", unsafe_allow_html=True)
 
 variation = st.selectbox("Display variation", ["Neon (Recommended)", "CRT", "Monochrome"], index=0)
-auto = st.checkbox("Auto refresh (1s)", value=True)
+
+# Manual refresh button (press to update time)
+# Pressing the button causes Streamlit to rerun the script and update the clock.
 
 # ASCII digit patterns (server-side)
 DIGITS = {
@@ -70,13 +72,7 @@ st.markdown(html, unsafe_allow_html=True)
 
 st.caption("Art Watch — retro-inspired digital clock. Use the Display variation selector to change style.")
 
-# auto refresh with safe fallback
-if auto:
-    try:
-        time.sleep(1)
-        # attempt to rerun; some Streamlit deployments may not expose experimental_rerun
-        st.experimental_rerun()
-    except Exception:
-        st.warning("Auto-refresh is not supported in this environment; please refresh the page manually or uncheck 'Auto refresh'.")
-        # short sleep to avoid tight loop
-        time.sleep(1)
+# Manual refresh button
+if st.button('Refresh now'):
+    # Button triggers a rerun automatically; no explicit rerun call needed.
+    pass
