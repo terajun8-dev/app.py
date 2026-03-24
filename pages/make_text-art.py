@@ -92,7 +92,7 @@ art = to_text_art(text, method, selected_font)
 # Display using Streamlit's native code/text components (reliable rendering)
 st.markdown("<div style='width:100%;display:flex;justify-content:center;'><div style='width:98%; padding:6px;'>", unsafe_allow_html=True)
 # show in st.code for monospace and preserved formatting; font-size is limited by Streamlit, but raw text will be correct
-st.code(art)
+st.code(art, language='text')
 # Also show editable raw text for copy/paste
 st.text_area('Raw text output (editable)', value=art, height=320)
 st.markdown("</div></div>", unsafe_allow_html=True)
